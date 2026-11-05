@@ -1,0 +1,7 @@
+{
+  "appId": "pl.kopanka.game",
+  "appName": "Kopanka",
+  "webDir": "dist",
+  "server": { "androidScheme": "http", "cleartext": true },
+  "plugins": { "SystemBars": { "insetsHandling": "disable" } }
+}
