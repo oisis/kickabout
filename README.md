@@ -4,27 +4,25 @@ Zręcznościowa piłka nożna z widokiem z góry, 11 na 11, na Androida (APK) i 
 
 ## Zrzuty ekranu
 
+Kliknij miniaturę, aby zobaczyć pełny rozmiar.
+
 **Android**
 
-| | | |
-|---|---|---|
-| <img src="docs/screenshots/android-1-menu.png" width="250" alt="Menu główne"> | <img src="docs/screenshots/android-2-match.png" width="250" alt="Mecz"> | <img src="docs/screenshots/android-3-club.png" width="250" alt="Mój klub"> |
-| Menu główne | Mecz: numery, przyciski PODANIE i STRZAŁ | Mój klub online: monety, ocena, sponsorzy |
-| <img src="docs/screenshots/android-4-market.png" width="250" alt="Rynek transferowy"> | <img src="docs/screenshots/android-5-club-match.png" width="250" alt="Mecz klubów online"> | |
-| Rynek transferowy: skład klubu komputera | Mecz online klubów: sponsor przed meczem | |
+| Menu główne | Mecz | Mój klub online | Rynek transferowy | Mecz klubów online |
+|:---:|:---:|:---:|:---:|:---:|
+| <a href="docs/screenshots/android-1-menu.png"><img src="docs/screenshots/thumbs/android-1-menu.png" alt="Menu główne"></a> | <a href="docs/screenshots/android-2-match.png"><img src="docs/screenshots/thumbs/android-2-match.png" alt="Mecz"></a> | <a href="docs/screenshots/android-3-club.png"><img src="docs/screenshots/thumbs/android-3-club.png" alt="Mój klub online"></a> | <a href="docs/screenshots/android-4-market.png"><img src="docs/screenshots/thumbs/android-4-market.png" alt="Rynek transferowy"></a> | <a href="docs/screenshots/android-5-club-match.png"><img src="docs/screenshots/thumbs/android-5-club-match.png" alt="Mecz klubów online"></a> |
+| logo, wersja | numery, PODANIE i STRZAŁ | monety, ocena, sponsorzy | skład klubu komputera z cenami | sponsor przed meczem |
 
-<img src="docs/screenshots/android-6-landscape.png" width="770" alt="Mecz w poziomie">
-
-Widok poziomy.
+| Widok poziomy |
+|:---:|
+| <a href="docs/screenshots/android-6-landscape.png"><img src="docs/screenshots/thumbs/android-6-landscape.png" alt="Mecz w poziomie"></a> |
 
 **Strona www**
 
-| | |
-|---|---|
-| <img src="docs/screenshots/www-1-home.png" width="420" alt="Strona główna"> | <img src="docs/screenshots/www-2-account.png" width="420" alt="Konto"> |
-| Strona główna z pobieraniem APK | Konto: klub, monety, połączenie aplikacji |
-| <img src="docs/screenshots/www-3-game-club.png" width="220" alt="Gra w przeglądarce — Mój klub"> | <img src="docs/screenshots/www-4-game-kits.png" width="220" alt="Stroje i barwy"> |
-| Gra w przeglądarce: Mój klub (sesja ze strony) | Stroje i barwy klubu |
+| Strona główna | Konto | Gra w przeglądarce: Mój klub | Stroje i barwy |
+|:---:|:---:|:---:|:---:|
+| <a href="docs/screenshots/www-1-home.png"><img src="docs/screenshots/thumbs/www-1-home.png" alt="Strona główna"></a> | <a href="docs/screenshots/www-2-account.png"><img src="docs/screenshots/thumbs/www-2-account.png" alt="Konto"></a> | <a href="docs/screenshots/www-3-game-club.png"><img src="docs/screenshots/thumbs/www-3-game-club.png" alt="Mój klub w przeglądarce"></a> | <a href="docs/screenshots/www-4-game-kits.png"><img src="docs/screenshots/thumbs/www-4-game-kits.png" alt="Stroje i barwy"></a> |
+| pobieranie APK | klub, monety, połączenie aplikacji | ta sama sesja co strona | kupno strojów za monety |
 
 ## Co jest w grze
 
