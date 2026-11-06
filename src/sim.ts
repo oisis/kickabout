@@ -88,7 +88,8 @@ export interface State {
   timer: number;
   kickoffTeam: number;
   restart: { type: RestartType; team: number; idx: number; x: number; y: number } | null;
-  pk: { team: number; idx: number; kicked: number; t: number } | null; // penalty in progress
+  /** Penalty in progress; `dive` is the side the keeper guesses at the kick (-1, 0, 1). */
+  pk: { team: number; idx: number; kicked: number; t: number; dive: number } | null;
   so: { goals: number[]; taken: number[]; turn: number; next: number[] } | null; // shootout
   score: number[];
   teams: Player[][];
@@ -334,7 +335,7 @@ function deadBall(s: State) {
       // his feet would be out again at once (throw-ins used to bounce between the teams forever).
       Object.assign(p, { x: clamp(r.x - div(dx * 360, d), 0, W), y: clamp(r.y - div(dy * 360, d), 0, H), vx: 0, vy: 0, ax: 0, ay: 0, fx: div(dx * 1000, d), fy: div(dy * 1000, d) });
       if (r.type === 'penalty') {
-        s.pk = { team: r.team, idx: r.idx, kicked: 0, t: 0 };
+        s.pk = { team: r.team, idx: r.idx, kicked: 0, t: 0, dive: 0 };
         Object.assign(s.teams[1 - r.team][0], { x: W / 2, y: ownGoalY(s, 1 - r.team), vx: 0, vy: 0 });
       }
       s.restart = null; s.phase = 'play';
@@ -462,7 +463,7 @@ function setupPenalty(s: State) {
   const p = s.teams[t][idx];
   Object.assign(p, { x: W / 2, y: PEN_SPOT + 360 });
   placeBall(s, W / 2, PEN_SPOT);
-  s.pk = { team: t, idx, kicked: 0, t: 0 };
+  s.pk = { team: t, idx, kicked: 0, t: 0, dive: 0 };
   s.controlled[t] = idx;
   s.phase = 'shootout'; s.timer = 60;
   give(s, t, idx);
@@ -523,7 +524,8 @@ function passTarget(s: State, t: number, p: Player): Player | null {
 /** Aim point inside the goal p's team attacks, or null when not facing it in range. */
 function goalAim(s: State, t: number, p: Player, from: { x: number; y: number }, skill: number): [number, number] | null {
   const gy = atk(s, t) === -1 ? 0 : H, tx = W / 2 - from.x, ty = gy - from.y, d = isqrt(tx * tx + ty * ty);
-  if (d > 38 * M || tx * p.fx + ty * p.fy <= 770 * d) return null;
+  // Within ~40° of the goal; from the penalty spot a diagonal (8-way stick) means the corner, ~60°.
+  if (d > 38 * M || tx * p.fx + ty * p.fy <= (s.pk ? 500 : 770) * d) return null;
   const side = p.fx > 300 ? 1 : p.fx < -300 ? -1 : 0;
   const spread = div(GOAL_HALF * (16 - skill), 10);
   return [W / 2 + side * div(GOAL_HALF * 7, 10) + rnd(s, spread + 1) - div(spread, 2), gy];
@@ -550,7 +552,7 @@ function kick(s: State, t: number, p: Player, hold: number) {
   b.vx = div(dx * speed, len); b.vy = div(dy * speed, len); b.vz = vz;
   s.ownerTeam = s.ownerIdx = -1; s.lastTouch = t; s.lastIdx = s.teams[t].indexOf(p); p.cool = 14;
   s.after = { team: t, ticks: AFTERTOUCH_TICKS };
-  if (s.pk) s.pk.kicked = 1;
+  if (s.pk) { s.pk.kicked = 1; s.pk.dive = rnd(s, 3) - 1; }
 }
 
 /**
@@ -620,14 +622,23 @@ function keeper(s: State, t: number) {
       const q = outfield.length ? outfield[rnd(s, outfield.length)] : s.teams[t][1];
       const dx = q.x - k.x, dy = q.y - k.y, d = isqrt(dx * dx + dy * dy) || 1;
       b.vx = div(dx * 430, d); b.vy = div(dy * 430, d); b.vz = 95;
-      s.ownerTeam = s.ownerIdx = -1; s.lastTouch = t; s.lastIdx = 0; k.cool = 40; s.keeperHold = 0;
+      s.ownerTeam = s.ownerIdx = -1; s.lastTouch = t; s.lastIdx = 0; k.cool = 12; s.keeperHold = 0; // just long enough not to catch his own throw
     }
     return;
   }
   if (s.pk && !s.pk.kicked) { k.vx = k.vy = 0; return; } // stays on the line until the kick
   const dist = Math.abs(b.y - gy);
+  // A shot coming at goal: dive along the line to where the ball will cross it, faster than running.
+  const incoming = gy === 0 ? -b.vy : b.vy;
+  if (!s.pk && s.ownerTeam < 0 && incoming > 250 && dist < BOX_DEPTH) { // a penalty is a guess, not a read
+    const xAt = b.x + div(b.vx * Math.abs(k.y - b.y), incoming);
+    if (Math.abs(xAt - W / 2) < GOAL_HALF + M) { steer(k, xAt, k.y, div(runSpeed(s, k) * (15 + k.gk), 10)); return; }
+  }
   let tx = clamp(b.x, W / 2 - GOAL_HALF, W / 2 + GOAL_HALF), ty = gy + a * M;
-  if (s.pk) ty = gy;
+  if (s.pk) { // committed to the guessed side at the kick: a dive, not a read of the shot
+    steer(k, W / 2 + s.pk.dive * div(GOAL_HALF * 6, 10), gy, div(runSpeed(s, k) * (15 + k.gk), 10));
+    return;
+  }
   else if (dist < BOX_DEPTH && Math.abs(b.x - W / 2) < BOX_HALF) {
     tx = clamp(b.x, W / 2 - AREA_HALF, W / 2 + AREA_HALF);
     ty = gy + a * Math.max(M, Math.min(div(dist * 45, 100), 6 * M));
@@ -637,18 +648,39 @@ function keeper(s: State, t: number) {
 
 function keeperSave(s: State, t: number) {
   const k = s.teams[t][0], b = s.ball, gy = ownGoalY(s, t);
-  if (k.off || k.cool || s.ownerTeam === t || k.down) return;
+  if (k.off || s.ownerTeam === t || k.down) return;
+  // Even a keeper who is still recovering blocks a ball struck straight at his body: it bounces off.
+  if (k.cool && s.ownerTeam < 0 && b.z < 2 * M && dist2(k, b.x, b.y) < 380 * 380 && Math.abs(b.vy) > 120) {
+    b.vy = atk(s, t) * Math.max(120, div(Math.abs(b.vy) * 3, 10)); b.vx = div(b.vx * 5, 10) + (b.x >= k.x ? 90 : -90); b.vz = 30; // away from goal
+    s.lastTouch = t; s.lastIdx = 0;
+    if (gy === 0 ? b.y < 120 : b.y > H - 120) b.y = gy === 0 ? 120 : H - 120;
+    return;
+  }
+  // A pass from a team-mate (a back-pass) is simply collected, also right after the keeper's own throw.
+  const backPass = s.ownerTeam < 0 && s.lastTouch === t && s.lastIdx !== 0;
+  if (k.cool && !backPass) return;
   if (Math.abs(b.y - gy) > BOX_DEPTH || Math.abs(b.x - W / 2) > BOX_HALF) return;
   const d2 = dist2(k, b.x, b.y);
   if (d2 > 1300 * 1300 || b.z > CROSSBAR + 200) return;
   if (s.ownerTeam >= 0 && d2 > 600 * 600) return; // only snatch from a dribbler up close
   const speed = isqrt(b.vx * b.vx + b.vy * b.vy);
   const towardGoal = (gy === 0 ? -b.vy : b.vy) > 150;
-  if (rnd(s, 100) >= clamp(130 - div(speed, 4) + (k.gk - 5) * 6, 15, 97)) { k.cool = 30; return; } // beaten
-  if (towardGoal) onTarget(s, 1 - t);
+  // How far from the keeper the ball will fly past (its path, not where it is now): a shot at the
+  // body is easy, one into the corner needs a full stretch. Harder shots and weaker keepers save less.
+  const reach = speed ? div(Math.abs((k.x - b.x) * b.vy - (k.y - b.y) * b.vx), speed) : isqrt(d2);
+  const chance = clamp(92 + (k.gk - 5) * 5 - div(Math.max(0, speed - 300), 9) - div(reach, 22) - (s.pk ? 25 : 0), 10, 97);
+  // Beaten. Missing a dribbler only costs a moment: the keeper must still be able to block the shot that follows.
+  // A penalty is one chance only.
+  if (!backPass && rnd(s, 100) >= chance) { k.cool = s.pk ? 90 : s.ownerTeam >= 0 ? 10 : 14; return; }
+  if (towardGoal && !backPass) onTarget(s, 1 - t);
+  // He got to it before it crossed the line: the ball stays in play.
+  const line = 120;
+  if (gy === 0 ? b.y < line : b.y > H - line) b.y = gy === 0 ? line : H - line;
   if (speed > 330) {
-    b.vy = -div(b.vy * 4, 10); b.vx = div(b.vx * 6, 10) + rnd(s, 161) - 80; b.vz = 45;
-    s.ownerTeam = s.ownerIdx = -1; s.lastTouch = t; s.lastIdx = 0; k.cool = 24;
+    // Parried wide, towards the nearer post and beyond, not back into the middle of the box.
+    const wide = b.x >= W / 2 ? 1 : -1;
+    b.vy = atk(s, t) * Math.max(140, div(Math.abs(b.vy) * 3, 10)); b.vx = wide * (160 + rnd(s, 120)) + div(b.vx, 4); b.vz = 45; // never back towards the goal
+    s.ownerTeam = s.ownerIdx = -1; s.lastTouch = t; s.lastIdx = 0; k.cool = 14;
     say(s, 'parry');
     return;
   }
