@@ -1,6 +1,6 @@
 # Kickabout website: home page, account pages, the game at /play/ and the APK at /download/.
 # /api/ and /ws are proxied to the API service (API_UPSTREAM, e.g. api:8787).
-FROM node:26-alpine AS build
+FROM --platform=$BUILDPLATFORM node:26-alpine AS build
 WORKDIR /src
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts

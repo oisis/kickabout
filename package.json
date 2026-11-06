@@ -8,7 +8,7 @@
     "preview": "vite preview --host --base ./",
     "test": "node --test test/",
     "server": "node server/server.ts",
-    "apk": "npm run build && cap sync android && cd android && ./gradlew --quiet assembleDebug assembleRelease && mkdir -p ../apk && cp app/build/outputs/apk/release/app-release.apk ../apk/kickabout.apk"
+    "apk": "npm run build && cap sync android && cd android && ./gradlew --quiet assembleDebug assembleRelease && mkdir -p ../apk && (cp app/build/outputs/apk/release/app-release.apk ../apk/kickabout.apk 2>/dev/null || cp app/build/outputs/apk/debug/app-debug.apk ../apk/kickabout.apk)"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.6.0",
