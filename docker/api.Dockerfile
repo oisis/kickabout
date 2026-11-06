@@ -5,6 +5,7 @@ ENV NODE_ENV=production PORT=8787 DB_PATH=/data/kickabout.db
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY server ./server
+COPY src ./src
 RUN mkdir /data && chown node:node /data
 USER node
 VOLUME /data

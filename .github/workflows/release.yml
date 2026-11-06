@@ -41,6 +41,19 @@ jobs:
       - run: npx tsc
       - run: npm test
 
+  # The API image must start and answer: catches files missing from the image.
+  smoke:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -f docker/api.Dockerfile -t kickabout-api:smoke .
+      - run: |
+          docker run -d --name api -p 8787:8787 kickabout-api:smoke
+          for i in $(seq 1 20); do curl -fs localhost:8787/healthz && break; sleep 1; done
+          curl -fs localhost:8787/version
+          curl -fs 'localhost:8787/clubs?group=pl:1' | head -c 200 || (docker logs api; exit 1)
+
   apk:
     needs: test
     runs-on: ubuntu-latest # has the Android SDK preinstalled
@@ -74,7 +87,7 @@ jobs:
         with: { name: apk, path: apk/kickabout.apk, if-no-files-found: error }
 
   images:
-    needs: apk
+    needs: [apk, smoke]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions: { contents: read, packages: write }
