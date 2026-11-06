@@ -23,7 +23,7 @@ export const minuteOptions = (): [number, string][] => MATCH_MINUTES.map((m) => 
 export const DEFAULT_OPTIONS: Options = { minutes: 5, extraTime: false, penalties: false, pitch: 4, autoReplay: true, autoSaveHighlights: true, sound: true, music: true };
 
 /** What a renderer needs to show a match: names and kits (kept beside, not inside, the sim state). */
-export interface MatchInfo { names: string[]; shorts: string[]; kits: Kit[]; keepers: string[]; players: string[][] }
+export interface MatchInfo { names: string[]; shorts: string[]; kits: Kit[]; keepers: string[]; players: string[][]; sponsors?: string[][] }
 export interface Highlight { info: MatchInfo; title: string; start: State; inputs: number[][] }
 
 function load<T>(key: string, fallback: T): T {

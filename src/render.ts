@@ -28,6 +28,7 @@ export function render(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo,
 
   ctx.setTransform(k, 0, 0, k, cw / 2 - cam.x * k, ch / 2 - cam.y * k);
   pitch(ctx, s.pitch);
+  boards(ctx, info);
   const things: [number, () => void][] = [[b.y, () => ball(ctx, s)]];
   s.teams.forEach((team, t) => team.forEach((p, i) => { if (!p.off) things.push([p.y, () => player(ctx, s, info, view, p, t, i)]); }));
   things.sort((a, z) => a[0] - z[0]).forEach(([, draw]) => draw());
@@ -63,6 +64,22 @@ function pitch(ctx: CanvasRenderingContext2D, surface: number) {
   net(ctx, W / 2 - GOAL_HALF, -2 * M - CROSSBAR, GOAL_HALF * 2, 2 * M);
   net(ctx, W / 2 - GOAL_HALF, H - CROSSBAR, GOAL_HALF * 2, 2 * M + CROSSBAR);
   goalFrame(ctx, 0);
+}
+
+/** Advertising boards beyond both touchlines: the home side's sponsors on the left, the away side's on the right. */
+function boards(ctx: CanvasRenderingContext2D, info: MatchInfo) {
+  const len = 8 * M, gap = 1.5 * M;
+  ctx.font = `800 ${0.55 * M}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  [[-2.4 * M, info.sponsors?.[0]], [W + 1.6 * M, info.sponsors?.[1]]].forEach(([x, list], side) => {
+    const names = (list as string[] | undefined)?.length ? (list as string[]) : ['KICKABOUT'];
+    for (let y = 0, i = 0; y + len <= H; y += len + gap, i++) {
+      ctx.fillStyle = '#0f172a'; ctx.fillRect(x as number, y, 0.8 * M, len);
+      ctx.save(); ctx.translate((x as number) + 0.4 * M, y + len / 2); ctx.rotate(side ? Math.PI / 2 : -Math.PI / 2);
+      ctx.fillStyle = i % 2 ? '#facc15' : '#f8fafc'; ctx.fillText(names[i % names.length].toUpperCase(), 0, 0, len - M);
+      ctx.restore();
+    }
+  });
+  ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
 }
 
 /** Goal net behind the frame: a light veil with a thin square mesh. */
@@ -243,6 +260,8 @@ function hud(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, cw: numbe
   if (s.frame < 300 && s.period === 0) {
     const name = info.names[view.me];
     text(ctx, s.sides[view.me] === -1 ? t('Grasz: {0} (atak w górę)', name) : t('Grasz: {0} (atak w dół)', name), cw / 2, ch * 0.2, u * 0.6);
+    // Club sponsors are announced before kick-off.
+    (info.sponsors ?? []).forEach((list, i) => list.length && text(ctx, t('Sponsorzy {0}: {1}', info.shorts[i], list.join(', ')), cw / 2, ch * (0.25 + 0.04 * i), u * 0.45, '#facc15'));
   }
   const age = s.frame - s.eventFrame;
   if (s.event && age < 110 && s.phase !== 'end') {

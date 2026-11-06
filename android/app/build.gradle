@@ -7,8 +7,11 @@ android {
         applicationId "com.kickabout.game"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Single source of truth: the version in package.json (1.2.3 → versionCode 10203).
+        def appVersion = new groovy.json.JsonSlurper().parse(rootProject.file('../package.json')).version
+        def (major, minor, patch) = appVersion.tokenize('.-')[0..2].collect { it as int }
+        versionCode major * 10000 + minor * 100 + patch
+        versionName appVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

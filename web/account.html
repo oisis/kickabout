@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#14532d" />
   <link rel="icon" href="/play/icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/site.css" />
+  <script src="/config.js"></script>
   <script type="module" src="/site.js"></script>
   <script type="module" src="/account.js"></script>
 </head>
@@ -37,6 +38,18 @@
     <div id="me" hidden>
       <h1 data-i18n="acc_title">Your account</h1>
       <div class="card profile"><img id="avatar" alt="" /><div><div class="name" id="name"></div><div class="muted" id="email"></div></div></div>
+
+      <div class="card">
+        <h3 data-i18n="club_title">My online club</h3>
+        <p><strong id="club"></strong> <span class="muted" id="coins"></span></p>
+        <a class="btn primary" href="/play/?club" data-i18n="club_manage">Manage the club in the game</a>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="app_title">Connect the app</h3>
+        <p class="muted" data-i18n="app_lead"></p>
+        <div class="cta"><button class="btn" id="app-code" data-i18n="app_btn">Show a code</button> <span class="code" id="code"></span></div>
+      </div>
 
       <div class="card">
         <h3 data-i18n="acc_name">Display name</h3>

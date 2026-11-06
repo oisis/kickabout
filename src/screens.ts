@@ -8,9 +8,12 @@ import { Net, savedServer, serverUrl, siteUrl } from './net.ts';
 import { h, show, title, btn, row, back, select, toggle, input, table, toast } from './ui.ts';
 import type { App } from './main.ts';
 import { compMenu } from './compScreens.ts';
+import { clubMenu } from './clubScreens.ts';
+import { token } from './api.ts';
 import { careerMenu } from './careerScreens.ts';
 import { editorMenu } from './editors.ts';
 import { t as tr, lang, setLang, LANGS } from './i18n.ts';
+import pkg from '../package.json' with { type: 'json' };
 
 export function mainMenu(app: App) {
   show(
@@ -21,11 +24,13 @@ export function mainMenu(app: App) {
       btn(tr('Kariera'), () => careerMenu(app), 'big'),
       btn(tr('Edytory drużyn i taktyk'), () => editorMenu(app)),
       btn(tr('Gra online'), () => online(app), 'big'),
+      btn(tr('Mój klub (online)'), () => clubMenu(app), 'big'),
       btn(tr('Najlepsze momenty'), () => highlightsScreen(app)),
       btn(tr('Opcje'), () => optionsScreen(app)),
       // The app opens it in the system browser (Capacitor hands off external URLs).
       siteUrl() && btn(tr('Strona www i konto'), () => { location.href = siteUrl(); }, 'ghost'),
     ),
+    h('p', { className: 'hint' }, `Kickabout ${pkg.version}`),
     h('p', { className: 'hint' }, tr('Dotyk: lewa strona – bieg, po prawej PODANIE i STRZAŁ (przytrzymaj = mocniej), bez piłki – wślizg. Klawiatura: strzałki, spacja = podanie, M = strzał (gracz 2: WASD, F = podanie, G = strzał). Pad: drążek, A = podanie, B = strzał, Start = pauza.')),
   );
 }
@@ -221,11 +226,12 @@ export function message(text: string, done: () => void) {
 
 function online(app: App) {
   const o = options();
-  const state = { address: savedServer(), team: TEAMS[0].id, mode: 'quick', code: '', minutes: o.minutes, pitch: o.pitch, extraTime: o.extraTime, penalties: o.penalties };
+  const state = { address: savedServer(), team: TEAMS[0].id, club: false, mode: 'quick', code: '', minutes: o.minutes, pitch: o.pitch, extraTime: o.extraTime, penalties: o.penalties };
   const draw = () => show(
     title(tr('Gra online'), tr('Obaj gracze łączą się z tym samym serwerem (scripts/start-server.sh)')),
     input(tr('Adres serwera'), state.address, (v) => { state.address = v; }, { placeholder: '192.168.1.10:8787', autocapitalize: 'off' }),
     select(tr('Twoja drużyna'), state.team, teamOptions(), (v) => { state.team = v; }),
+    toggle(tr('Zagraj moim klubem online (nagrody, wymaga konta)'), state.club, (v) => { state.club = v; }),
     select(tr('Tryb'), state.mode, [['quick', tr('Szybka gra — losowy przeciwnik')], ['host', tr('Załóż pokój dla znajomego')], ['join', tr('Dołącz do pokoju znajomego')]], (v) => { state.mode = v; draw(); }),
     state.mode === 'join' && input(tr('Kod pokoju'), state.code, (v) => { state.code = v.toUpperCase(); }, { maxLength: 4, autocapitalize: 'characters' }),
     // Both players propose a length; when they differ the server draws one of the two.
@@ -237,8 +243,9 @@ function online(app: App) {
     row(back(() => app.menu()), btn(tr('Połącz'), () => {
       if (!state.address.trim()) return toast(tr('Podaj adres serwera'));
       if (state.mode === 'join' && state.code.length !== 4) return toast(tr('Kod pokoju ma 4 litery'));
-      const config = { team: team(state.team, customTeams()), minutes: state.minutes, pitch: choosePitch(state.pitch), extraTime: state.extraTime, penalties: state.penalties };
-      const net = new Net(serverUrl(state.address), { room: state.mode === 'host' ? 'new' : state.mode === 'join' ? state.code : undefined, config });
+      // With `club` the server swaps in the player's online club (signed in by cookie or the app's token).
+      const config = { team: team(state.team, customTeams()), club: state.club, minutes: state.minutes, pitch: choosePitch(state.pitch), extraTime: state.extraTime, penalties: state.penalties };
+      const net = new Net(serverUrl(state.address), { room: state.mode === 'host' ? 'new' : state.mode === 'join' ? state.code : undefined, config, token: token() || undefined });
       net.onStart = () => app.startMatch(onlineSpec(net));
       app.startMatch({ ...makeSpec({ team: config.team, human: 1 }, { team: TEAMS[1], human: 0 }, o), net });
     }, 'primary')),

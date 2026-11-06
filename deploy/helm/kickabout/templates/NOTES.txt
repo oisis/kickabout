@@ -3,8 +3,10 @@ Kickabout is deployed.
   Website:  {{ .Values.publicUrl }}
   Game:     {{ .Values.publicUrl }}/play/
   APK:      {{ .Values.publicUrl }}/download/kickabout.apk
-  Android app server address: {{ .Values.publicUrl | replace "https://" "wss://" | replace "http://" "ws://" }}/ws
+{{- $api := .Values.apiUrl | default (printf "%s/api" .Values.publicUrl) }}
+  API:      {{ $api }}
+  Online matches (WebSocket): {{ (.Values.apiUrl | default .Values.publicUrl) | replace "https://" "wss://" | replace "http://" "ws://" }}/ws
 
 OAuth redirect URIs to register:
-  {{ .Values.publicUrl }}/api/auth/google/callback
-  {{ .Values.publicUrl }}/api/auth/github/callback
+  {{ $api }}/auth/google/callback
+  {{ $api }}/auth/github/callback

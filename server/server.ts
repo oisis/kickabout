@@ -13,6 +13,9 @@ import { clubs } from './clubs.ts';
 import { matchMinutes } from '../src/store.ts';
 import { onlineMatch } from '../src/data.ts';
 import { newMatch, step, type State } from '../src/sim.ts';
+import pkg from '../package.json' with { type: 'json' };
+
+export const VERSION: string = pkg.version;
 
 const DELAY = 6; // input delay in ticks (100 ms at 60 Hz)
 const MAX_AHEAD = 600; // 10 s of buffered inputs before we give up on a lagging peer
@@ -36,6 +39,7 @@ export function startServer(port: number, opts: AccountOptions = {}): Server {
   sweeper.unref();
   const http = createServer(async (req, res) => {
     if (req.url === '/healthz') { res.writeHead(200).end('ok'); return; }
+    if (req.url === '/version' || req.url === '/api/version') { res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }).end(JSON.stringify({ version: VERSION })); return; }
     if (!(await api.handle(req, res))) res.writeHead(404, { 'content-type': 'text/plain' }).end('Kickabout API');
   });
   http.on('close', () => clearInterval(sweeper));
@@ -161,7 +165,7 @@ if (import.meta.main) {
     cookieDomain: env.COOKIE_DOMAIN || undefined, providers, devLogin: env.DEV_LOGIN === '1',
   }).on('listening', () => {
     const ips = Object.values(networkInterfaces()).flat().filter((i) => i?.family === 'IPv4' && !i.internal).map((i) => i!.address);
-    log(`Kickabout API na porcie ${port}; logowanie: ${[...Object.keys(providers), ...(env.DEV_LOGIN === '1' ? ['dev'] : [])].join(', ') || 'wyłączone'}.`);
+    log(`Kickabout API ${VERSION} na porcie ${port}; logowanie: ${[...Object.keys(providers), ...(env.DEV_LOGIN === '1' ? ['dev'] : [])].join(', ') || 'wyłączone'}.`);
     for (const ip of ips) log(`  w aplikacji podaj: ${ip}:${port}`);
   });
 }

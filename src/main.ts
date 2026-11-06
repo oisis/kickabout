@@ -141,6 +141,8 @@ function frame(now: number) {
 }
 requestAnimationFrame(frame);
 app.menu();
+// The website's "My club" link opens the game on that screen.
+if (new URLSearchParams(location.search).has('club')) import('./clubScreens.ts').then((m) => m.clubMenu(app));
 
 // On-device test hook, only when opened with ?debug: live state and controls.
 if (new URLSearchParams(location.search).has('debug')) Object.assign(globalThis, { kickabout: { app, state: () => app.run?.s, controls } });

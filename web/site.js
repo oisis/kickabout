@@ -17,7 +17,9 @@ const TEXT = {
     dl_3: 'Start Kickabout. For online play the server address is already filled in.',
     dl_btn: '⬇ Download APK', dl_missing: 'The APK is not published on this server yet.',
     footer: 'Kickabout — all clubs and players are fictional.',
-    acc_title: 'Your account', acc_signin_title: 'Sign in', acc_signin_lead: 'Use an account you already have. We only read your name, e-mail and avatar.',
+    acc_title: 'Your account',
+    club_title: 'My online club', club_none: 'No club yet. Found one or buy an existing club in the game.', club_manage: 'Manage the club in the game', coins: 'coins',
+    app_title: 'Connect the app', app_lead: 'In the Android app open “My club (online)” and enter this code. It works once, for 10 minutes.', app_btn: 'Show a code', acc_signin_title: 'Sign in', acc_signin_lead: 'Use an account you already have. We only read your name, e-mail and avatar.',
     with_google: 'Continue with Google', with_github: 'Continue with GitHub', with_dev: 'Sign in (development)',
     dev_name: 'Name', no_providers: 'Sign-in is not configured on this server yet.',
     acc_name: 'Display name', save: 'Save', saved: 'Saved.',
@@ -46,7 +48,9 @@ const TEXT = {
     dl_3: 'Uruchom Kickabout. Adres serwera do gry online jest już wpisany.',
     dl_btn: '⬇ Pobierz APK', dl_missing: 'APK nie jest jeszcze opublikowany na tym serwerze.',
     footer: 'Kickabout — wszystkie kluby i zawodnicy są fikcyjni.',
-    acc_title: 'Twoje konto', acc_signin_title: 'Zaloguj się', acc_signin_lead: 'Użyj konta, które już masz. Odczytujemy tylko imię, e-mail i awatar.',
+    acc_title: 'Twoje konto',
+    club_title: 'Mój klub online', club_none: 'Nie masz jeszcze klubu. Załóż go albo kup istniejący w grze.', club_manage: 'Zarządzaj klubem w grze', coins: 'monet',
+    app_title: 'Połącz aplikację', app_lead: 'W aplikacji na Androida otwórz „Mój klub (online)” i wpisz ten kod. Działa raz, przez 10 minut.', app_btn: 'Pokaż kod', acc_signin_title: 'Zaloguj się', acc_signin_lead: 'Użyj konta, które już masz. Odczytujemy tylko imię, e-mail i awatar.',
     with_google: 'Kontynuuj z Google', with_github: 'Kontynuuj z GitHub', with_dev: 'Zaloguj (tryb deweloperski)',
     dev_name: 'Imię', no_providers: 'Logowanie nie jest jeszcze skonfigurowane na tym serwerze.',
     acc_name: 'Nazwa wyświetlana', save: 'Zapisz', saved: 'Zapisano.',
@@ -64,8 +68,10 @@ const saved = (() => { try { return localStorage.getItem('kickabout.lang'); } ca
 export const lang = saved === 'pl' || saved === 'en' ? saved : navigator.language.startsWith('pl') ? 'pl' : 'en';
 export const t = (k) => TEXT[lang][k] ?? TEXT.en[k] ?? k;
 
+/** The API: behind this site at /api, or on its own subdomain (config.js, written when the container starts). */
+export const API = (window.KICKABOUT?.api || '/api').replace(/\/$/, '');
 export const api = async (path, init = {}) => {
-  const r = await fetch(`/api${path}`, { ...init, headers: { 'content-type': 'application/json', ...init.headers } });
+  const r = await fetch(`${API}${path}`, { ...init, credentials: 'include', headers: { 'content-type': 'application/json', ...init.headers } });
   return { status: r.status, data: await r.json().catch(() => ({})) };
 };
 
@@ -96,3 +102,5 @@ async function header() {
 
 translate();
 header();
+// Version of the running API in the footer.
+api('/version').then(({ data }) => { const f = document.querySelector('footer .wrap'); if (f && data.version) f.append(` • v${data.version}`); }).catch(() => {});

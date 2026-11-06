@@ -128,3 +128,12 @@ test('a ball kicked into touch rolls over the line, then is placed on it for the
   while (s.phase === 'out' && s.ball.x !== W) step(s, [0, 0]);
   assert.deepEqual([s.ball.x, s.ball.vx, s.phase], [W, 0, 'out']); // on the line, waiting for the taker
 });
+
+test('restarts do not loop: a 5-minute match lasts about 5 minutes', () => {
+  // Throw-in takers used to stand outside the line with the ball, which went out again at once.
+  for (let seed = 1; seed <= 8; seed++) {
+    const s = newMatch(seed * 7919, { ...setup({ minutes: 5, pitch: seed % 7 }), teams: [teamSetup(TEAMS[300]), teamSetup(TEAMS[200 + seed])] });
+    while (s.phase !== 'end' && s.frame < 60000) step(s, [cpuInput(s, 0), cpuInput(s, 1)]);
+    assert.ok(s.frame < 5 * 3600 * 1.3, `seed ${seed}: ${(s.frame / 3600).toFixed(1)} min`);
+  }
+});

@@ -12,6 +12,8 @@ RUN npm run build
 FROM nginx:1.29-alpine
 ENV API_UPSTREAM=api:8787
 COPY docker/nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY --chmod=755 docker/40-kickabout-config.sh /docker-entrypoint.d/40-kickabout-config.sh
+ENV PUBLIC_API_URL=
 COPY web /usr/share/nginx/html
 COPY --from=build /src/dist /usr/share/nginx/html/play
 # Built separately (needs the Android SDK): npm run apk puts it in apk/kickabout.apk (.dockerignore drops the rest).

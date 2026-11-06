@@ -1,5 +1,5 @@
 // Account page: sign in with a provider, then manage name, linked providers, sessions and deletion.
-import { t, lang, api, setHeader } from './site.js';
+import { t, lang, api, setHeader, API } from './site.js';
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
@@ -20,7 +20,7 @@ async function signedOut() {
   $('#me').hidden = true; $('#signin').hidden = false;
   const { data } = await api('/config');
   const box = $('#providers');
-  box.replaceChildren(...(data.providers ?? []).map((p) => el('a', { className: 'btn', href: `/api/auth/${p}`, textContent: t(`with_${p}`) })));
+  box.replaceChildren(...(data.providers ?? []).map((p) => el('a', { className: 'btn', href: `${API}/auth/${p}`, textContent: t(`with_${p}`) })));
   if (data.devLogin) {
     const name = el('input', { type: 'text', placeholder: t('dev_name'), required: true, maxLength: 40 });
     const form = el('form', { className: 'inline' }, name, el('button', { className: 'btn ghost', textContent: t('with_dev') }));
@@ -45,14 +45,28 @@ function show(me) {
       return el('li', {}, el('strong', { textContent: NAMES[i.provider] ?? i.provider }), el('span', { className: 'grow muted', textContent: i.email }), b);
     }),
     ...me.providers.filter((p) => !linked.has(p)).map((p) =>
-      el('li', {}, el('strong', { textContent: NAMES[p] }), el('span', { className: 'grow' }), el('a', { className: 'btn', href: `/api/auth/${p}?link=1`, textContent: t('link') }))),
+      el('li', {}, el('strong', { textContent: NAMES[p] }), el('span', { className: 'grow' }), el('a', { className: 'btn', href: `${API}/auth/${p}?link=1`, textContent: t('link') }))),
   );
   $('#sessions').replaceChildren(...me.sessions.map((s) => el('li', {},
     el('span', { className: 'grow', textContent: s.agent.replace(/^Mozilla\/5\.0 /, '') || '—', title: s.agent }),
     el('span', { className: 'muted', textContent: `${t('since')} ${date(s.created)}` }),
     s.current ? el('span', { className: 'tag', textContent: t('this_device') }) : '')));
   $('#logout-others').hidden = me.sessions.length < 2;
+  club();
 }
+
+/** Coins and the online club (managed in the game, which shares this site's sign-in). */
+async function club() {
+  const { status, data } = await api('/me/club');
+  if (status !== 200) return;
+  $('#coins').textContent = `${data.coins.toLocaleString(lang)} ${t('coins')}`;
+  $('#club').textContent = data.club ? `${data.club.name} (${data.club.short}) • ${data.club.rating}` : t('club_none');
+}
+
+$('#app-code').onclick = async () => {
+  const r = await api('/me/app-code', { method: 'POST' });
+  if (r.status === 200) $('#code').textContent = r.data.code.replace(/(...)(...)/, '$1 $2');
+};
 
 async function act(path, method, body) {
   const r = await api(path, { method, body: body && JSON.stringify(body) });

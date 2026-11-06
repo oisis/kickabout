@@ -331,7 +331,9 @@ function deadBall(s: State) {
       const p = s.teams[r.team][r.idx];
       const gx = W / 2, gy = r.type === 'penalty' ? ownGoalY(s, 1 - r.team) : H / 2;
       const dx = gx - r.x, dy = gy - r.y, d = isqrt(dx * dx + dy * dy) || 1;
-      Object.assign(p, { x: r.x - div(dx * 360, d), y: r.y - div(dy * 360, d), vx: 0, vy: 0, ax: 0, ay: 0, fx: div(dx * 1000, d), fy: div(dy * 1000, d) });
+      // The taker stands just behind the spot but never beyond the lines: from there the ball at
+      // his feet would be out again at once (throw-ins used to bounce between the teams forever).
+      Object.assign(p, { x: clamp(r.x - div(dx * 360, d), 0, W), y: clamp(r.y - div(dy * 360, d), 0, H), vx: 0, vy: 0, ax: 0, ay: 0, fx: div(dx * 1000, d), fy: div(dy * 1000, d) });
       if (r.type === 'penalty') {
         s.pk = { team: r.team, idx: r.idx, kicked: 0, t: 0 };
         Object.assign(s.teams[1 - r.team][0], { x: W / 2, y: ownGoalY(s, 1 - r.team), vx: 0, vy: 0 });

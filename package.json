@@ -1,5 +1,6 @@
 {
   "name": "kickabout",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,6 +8,7 @@
     "build": "tsc && vite build --base ./",
     "preview": "vite preview --host --base ./",
     "test": "node --test test/",
+    "version": "sed -i -E \"s/^(version|appVersion): .*/\\1: $npm_package_version/\" deploy/helm/kickabout/Chart.yaml && git add deploy/helm/kickabout/Chart.yaml",
     "server": "node server/server.ts",
     "apk": "npm run build && cap sync android && cd android && ./gradlew --quiet assembleDebug assembleRelease && mkdir -p ../apk && (cp app/build/outputs/apk/release/app-release.apk ../apk/kickabout.apk 2>/dev/null || cp app/build/outputs/apk/debug/app-debug.apk ../apk/kickabout.apk)"
   },

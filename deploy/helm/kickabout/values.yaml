@@ -1,8 +1,15 @@
-# Public address of the site; OAuth redirect URIs are <publicUrl>/api/auth/{google,github}/callback.
-publicUrl: https://kickabout.example.com
+# Public address of the website.
+publicUrl: https://www.example.pl
+# Optional API subdomain, e.g. https://api.example.pl (set ingress.apiHost too). Empty: the API
+# lives behind the website at <publicUrl>/api. OAuth redirect URIs:
+#   with apiUrl:    <apiUrl>/auth/{google,github}/callback
+#   without:        <publicUrl>/api/auth/{google,github}/callback
+apiUrl: ""
+# Cookie domain shared by the website and the API subdomain (e.g. example.pl); empty without apiUrl.
+cookieDomain: ""
 
 api:
-  image: { repository: ghcr.io/oisis/kickabout-api, tag: latest, pullPolicy: IfNotPresent }
+  image: { repository: ghcr.io/oisis/kickabout-api, tag: "", pullPolicy: IfNotPresent } # tag "" = the chart's appVersion
   # SQLite on a ReadWriteOnce volume: keep a single replica.
   persistence:
     size: 1Gi
@@ -24,7 +31,7 @@ api:
 imagePullSecrets: []   # - name: ghcr-pull-secret
 
 web:
-  image: { repository: ghcr.io/oisis/kickabout-web, tag: latest, pullPolicy: IfNotPresent }
+  image: { repository: ghcr.io/oisis/kickabout-web, tag: "", pullPolicy: IfNotPresent }
   replicas: 2
   # NodePort exposes the site over plain HTTP on every node (e.g. phones on the LAN without the ingress).
   service: { type: ClusterIP, nodePort: null }
@@ -35,7 +42,8 @@ web:
 ingress:
   enabled: true
   className: nginx
-  host: kickabout.example.com
+  host: www.example.pl
+  apiHost: ""          # e.g. api.example.pl (routes straight to the API service)
   annotations:
     # Online matches keep a WebSocket open for the whole game.
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"

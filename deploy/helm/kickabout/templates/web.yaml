@@ -19,9 +19,11 @@ spec:
       {{- end }}
       containers:
         - name: web
-          image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag }}"
+          image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.web.image.pullPolicy }}
-          env: [{ name: API_UPSTREAM, value: "{{ .Release.Name }}-api:8787" }]
+          env:
+            - { name: API_UPSTREAM, value: "{{ .Release.Name }}-api:8787" }
+            - { name: PUBLIC_API_URL, value: {{ .Values.apiUrl | quote }} } # the site and the game call the API there
           ports: [{ name: http, containerPort: 8080 }]
           readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 10 }
           livenessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 30 }

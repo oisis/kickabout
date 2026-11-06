@@ -22,6 +22,8 @@ export interface MatchSpec {
   manage?: number[]; // teams whose tactics and substitutions the user controls without playing (career coach)
   net?: Net;
   autoReplay: boolean;
+  /** Keep every input word of the home side (a prize match the server replays to verify). */
+  record?: boolean;
 }
 
 export class MatchRun {
@@ -32,6 +34,7 @@ export class MatchRun {
   private queued = [0, 0];
   private snaps: State[] = [];
   private log: number[][] = []; // inputs by frame, trimmed to the replay window
+  recorded: number[] = []; // home inputs of the whole match when spec.record
   private logStart = 0;
   private pendingGoal = -1;
   private lastEvent = 0;
@@ -99,6 +102,7 @@ export class MatchRun {
       this.logStart = keepFrom;
     }
     this.log.push(inputs);
+    if (this.spec.record && s.phase !== 'end') this.recorded.push(inputs[0]);
     step(s, inputs);
     this.sounds(before);
     if (s.event === 'goal' && s.eventFrame === s.frame && s.period < 4) this.pendingGoal = s.frame;
@@ -186,6 +190,7 @@ export function makeSpec(home: Side, away: Side, o: Options, rules: Rules = {}, 
       kits,
       keepers: sides.map((x) => x.team.keeper),
       players: sides.map((x) => x.team.players.map((p) => p.name)),
+      sponsors: sides.map((x) => x.team.sponsors ?? []),
     },
   };
 }
