@@ -4,7 +4,7 @@ import {
   type State, type Player, W, H, M, GOAL_HALF, CROSSBAR, BOX_HALF, BOX_DEPTH,
   AREA_HALF, AREA_DEPTH, CIRCLE_R, PEN_SPOT, minute,
 } from './sim.ts';
-import { type Controls, STICK_R, PAUSE_BTN } from './input.ts';
+import { type Controls, STICK_R, PAUSE_BTN, SHOT_BTN, PASS_BTN } from './input.ts';
 import type { MatchInfo } from './store.ts';
 import { t, EVENT_TEXT } from './i18n.ts';
 
@@ -17,7 +17,8 @@ const cam = { x: W / 2, y: H / 2 };
 
 export function render(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, c: Controls, view: View) {
   const cw = ctx.canvas.width, ch = ctx.canvas.height, dpr = devicePixelRatio || 1;
-  const k = Math.max(cw, ch) / (44 * M); // px per unit
+  // px per unit: portrait shows 44 m of pitch top to bottom; landscape fits ~24 m vertically (and most of the width).
+  const k = cw > ch ? ch / (24 * M) : ch / (44 * M);
   const b = s.ball;
   cam.x += (b.x - cam.x) * 0.12;
   cam.y += (b.y - b.z - cam.y) * 0.12;
@@ -294,8 +295,11 @@ function touchControls(ctx: CanvasRenderingContext2D, c: Controls, cw: number, c
     ctx.beginPath(); ctx.arc(s.x * dpr, s.y * dpr, 26 * dpr, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fill();
   }
-  ctx.beginPath(); ctx.arc(cw - 90 * dpr, ch - 110 * dpr, 55 * dpr, 0, Math.PI * 2);
-  ctx.fillStyle = c.kicks.size ? 'rgba(250,204,21,0.6)' : 'rgba(255,255,255,0.2)'; ctx.fill();
   ctx.textAlign = 'center';
-  text(ctx, t('KOP'), cw - 90 * dpr, ch - 110 * dpr, 20 * dpr);
+  for (const [b, on, label, size] of [[SHOT_BTN, c.shots.size, t('STRZAŁ'), 18], [PASS_BTN, c.passes.size, t('PODANIE'), 14]] as const) {
+    const x = cw + b.x * dpr, y = ch + b.y * dpr;
+    ctx.beginPath(); ctx.arc(x, y, b.r * dpr, 0, Math.PI * 2);
+    ctx.fillStyle = on ? 'rgba(250,204,21,0.6)' : 'rgba(255,255,255,0.2)'; ctx.fill();
+    text(ctx, label, x, y, size * dpr);
+  }
 }

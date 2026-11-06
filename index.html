@@ -58,6 +58,15 @@
       .presets button { padding: 11px 8px; font-size: 15px; }
       .hint { color: var(--muted); font-size: 13px; text-align: center; }
       .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #111827; color: #fff; padding: 10px 16px; border-radius: 10px; z-index: 10; }
+      /* Phones held sideways: compact header and two columns of buttons. */
+      @media (orientation: landscape) and (max-height: 520px) {
+        #ui { max-width: 860px; padding-top: max(8px, env(safe-area-inset-top)); gap: 8px; }
+        .logo { font-size: 36px; margin: 4px 0; }
+        nav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        button { padding: 10px 14px; }
+        button.big { padding: 12px; font-size: 17px; }
+        header h1 { font-size: 22px; }
+      }
     </style>
   </head>
   <body>

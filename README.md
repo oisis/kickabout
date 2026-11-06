@@ -21,7 +21,8 @@ ANDROID_HOME=~/Android/Sdk npm run apk   # APK debug i release → apk/kickabout
   - 7 rodzajów murawy (losowa albo zależna od pory roku);
   - zmiana stron, dogrywka, seria rzutów karnych;
   - numery na koszulkach, pauza, powtórki goli, statystyki, dźwięk.
-- **Sterowanie:** dotyk (drążek po lewej, KOP po prawej, krótko = podanie, dłużej = strzał, bez piłki = wślizg), klawiatura (gracz 2: WASD + F) i pad.
+- **Sterowanie:** dotyk (drążek po lewej, po prawej przyciski PODANIE i STRZAŁ; im dłużej trzymasz STRZAŁ, tym mocniej; bez piłki oba robią wślizg), klawiatura (spacja = podanie, M = strzał; gracz 2: WASD, F, G) i pad (A = podanie, B = strzał). Gra działa w pionie i w poziomie.
+- **Długość meczu:** 5, 10, 15 albo 20 minut.
 - **Tryby:**
   - mecz towarzyski (gracz kontra komputer, 2 graczy na jednym urządzeniu, komputer kontra komputer);
   - rozgrywki: liga, puchar (jeden mecz albo dwumecz z bramkami na wyjeździe), turniej (grupy + puchar), gotowe albo własne;
@@ -89,7 +90,7 @@ Potem jedna z opcji:
 - **Załóż pokój:** dostajesz kod dla znajomego.
 - **Dołącz:** wpisujesz kod pokoju znajomego.
 
-Długość meczu, murawę i zasady ustala założyciel pokoju. Opóźnienie sterowania wynosi 100 ms.
+Murawę i zasady ustala założyciel pokoju (w szybkiej grze: gracz, który czekał pierwszy). Długość meczu proponują obaj gracze: gdy się różnią, serwer losuje jedną z dwóch. Opóźnienie sterowania wynosi 100 ms.
 
 ## Wdrożenie
 

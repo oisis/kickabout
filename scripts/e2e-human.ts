@@ -125,11 +125,11 @@ class Device {
   fingerprint() { return this.js<string>(`JSON.stringify({ ...kickabout.app.run.s, frame: 0, prevInput: [0, 0], eventFrame: 0 })`).then((j) => createHash('sha256').update(j).digest('hex').slice(0, 16)); }
 }
 
-/** A thumb on the stick (left) and taps or holds on the right half: pass, shot or slide tackle. */
+/** A thumb on the stick (left) and taps on PASS or holds on SHOT (right); without the ball either one slides. */
 function startPlaying(d: Device) {
   let alive = true, down = false;
   (async () => {
-    const stick = { x: 103, y: 640, id: 1 }, kick = { x: 330, y: 780, id: 2 };
+    const stick = { x: 103, y: 640, id: 1 }, shot = { x: 411 - 78, y: 914 - 100, id: 2 }, pass = { x: 411 - 190, y: 914 - 62, id: 2 };
     while (alive) {
       try {
         const a = Math.random() * Math.PI * 2, r = 30 + Math.random() * 30;
@@ -137,9 +137,10 @@ function startPlaying(d: Device) {
         if (!down) { await d.touch('touchStart', [stick]); down = true; }
         await d.touch('touchMove', [moved]);
         if (Math.random() < 0.45) {
-          await d.touch('touchStart', [moved, kick]);
-          await sleep(Math.random() < 0.5 ? 60 : 200 + Math.random() * 350);
-          await d.touch('touchEnd', [kick]);
+          const b = Math.random() < 0.5 ? pass : shot;
+          await d.touch('touchStart', [moved, b]);
+          await sleep(b === pass ? 60 : 100 + Math.random() * 450);
+          await d.touch('touchEnd', [b]);
         }
         await sleep(300 + Math.random() * 700);
       } catch { /* screen changing */ }
@@ -308,7 +309,7 @@ async function main() {
   A.snap('start'); B.snap('start');
 
   log('1. Konfiguracja aplikacji i drużyn');
-  await Promise.all([setOptions(A, 'pl', '3 min', false), setOptions(B, 'en', '3 min', false)]);
+  await Promise.all([setOptions(A, 'pl', '5 min', false), setOptions(B, 'en', '5 min', false)]);
   const pickTeam = (d: Device, i: number) => d.js<string>(`(async () => { document.querySelectorAll('#ui nav button')[4].click(); await new Promise((r) => setTimeout(r, 200));
     const n = document.querySelectorAll('#ui select')[0].options[${i}].text; document.querySelector('#ui .row button.ghost').click(); return n; })()`);
   const [origA, origB] = [await pickTeam(A, 0), await pickTeam(B, 13)];

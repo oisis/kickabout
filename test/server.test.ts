@@ -26,7 +26,8 @@ test('pairs two players and relays a frame once both inputs arrive', async () =>
   assert.equal(sa.seed, sb.seed);
   assert.deepEqual([sa.side, sb.side], [0, 1]);
   assert.deepEqual(sa.config, sb.config);
-  assert.deepEqual([sa.config.home.id, sa.config.away.id, sa.config.minutes], ['A', 'B', 5]); // host settings, each brings its team
+  assert.deepEqual([sa.config.home.id, sa.config.away.id], ['A', 'B']); // each brings its team
+  assert.ok([5, 10].includes(sa.config.minutes) && sa.config.minutesDrawn, 'different lengths: one of the two is drawn');
 
   a.send({ t: 'in', k: 0, b: 5 });
   b.send({ t: 'in', k: 0, b: 2 ** 25 + 3 }); // masked to the 24-bit input word

@@ -2,7 +2,7 @@
 import { create, record, roundFixtures, simulate, standings, topScorers, stageName, isHuman, decisive, firstLeg, PRESETS, DEFAULT_RULES, type Competition, type Fixture, type Kind, type Rules } from './competition.ts';
 import { team, type TeamDef } from './data.ts';
 import { makeSpec, type Side } from './match.ts';
-import { options, slots, saveSlot, deleteSlot, customTeams, download, upload } from './store.ts';
+import { options, slots, saveSlot, deleteSlot, customTeams, download, upload, matchMinutes, minuteOptions } from './store.ts';
 import { h, show, title, btn, row, back, select, toggle, input, table, toast } from './ui.ts';
 import { allTeams, lineupScreen } from './screens.ts';
 import { LEAGUE_COUNTRIES, leagueLabel } from './data.ts';
@@ -78,7 +78,7 @@ function diy(app: App) {
       state.kind !== 'league' && toggle(tr('Bramki na wyjeździe'), state.rules.awayGoals, (v) => { state.rules.awayGoals = v; }),
       state.kind !== 'league' && toggle(tr('Dogrywka'), state.rules.extraTime, (v) => { state.rules.extraTime = v; }),
       state.kind !== 'league' && toggle(tr('Rzuty karne'), state.rules.penalties, (v) => { state.rules.penalties = v; }),
-      select(tr('Długość meczu'), state.rules.minutes ?? 3, [[3, '3 min'], [5, '5 min'], [7, '7 min'], [10, '10 min']], (v) => { state.rules.minutes = v; }),
+      select(tr('Długość meczu'), matchMinutes(state.rules.minutes), minuteOptions(), (v) => { state.rules.minutes = v; }),
       h('p', { className: 'sub' }, tr('Drużyny ({0}):', state.teams.size)),
       // Whole leagues or national-team pools are added at once; the list below shows one group at a time.
       select(tr('Dodaj drużyny'), '', [['', tr('— wybierz —')], ...groups.map(([k, label]): [string, string] => [k, label])], (k) => { pick(k).forEach((x) => state.teams.add(x.id)); state.show = k; draw(); }),

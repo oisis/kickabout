@@ -14,7 +14,13 @@ export interface Options {
   sound: boolean;
   music: boolean;
 }
-export const DEFAULT_OPTIONS: Options = { minutes: 3, extraTime: false, penalties: false, pitch: 4, autoReplay: true, autoSaveHighlights: true, sound: true, music: true };
+/** Real minutes for a whole match (90 game minutes). */
+export const MATCH_MINUTES = [5, 10, 15, 20];
+/** A valid match length; older saves used 3/5/7/10 and round up. */
+export const matchMinutes = (m: unknown): number => MATCH_MINUTES.find((x) => x >= (Number(m) || 0)) ?? MATCH_MINUTES[MATCH_MINUTES.length - 1];
+export const minuteOptions = (): [number, string][] => MATCH_MINUTES.map((m) => [m, `${m} min`]);
+
+export const DEFAULT_OPTIONS: Options = { minutes: 5, extraTime: false, penalties: false, pitch: 4, autoReplay: true, autoSaveHighlights: true, sound: true, music: true };
 
 /** What a renderer needs to show a match: names and kits (kept beside, not inside, the sim state). */
 export interface MatchInfo { names: string[]; shorts: string[]; kits: Kit[]; keepers: string[]; players: string[][] }
@@ -38,7 +44,7 @@ function save(key: string, v: unknown): boolean {
   }
 }
 
-export const options = (): Options => ({ ...DEFAULT_OPTIONS, ...load<Partial<Options>>('options', {}) });
+export const options = (): Options => { const o = { ...DEFAULT_OPTIONS, ...load<Partial<Options>>('options', {}) }; return { ...o, minutes: matchMinutes(o.minutes) }; };
 export const saveOptions = (o: Options) => save('options', o);
 
 const MAX_HIGHLIGHTS = 30;

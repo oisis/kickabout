@@ -7,6 +7,7 @@ import { networkInterfaces } from 'node:os';
 import { randomInt } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { accounts, envProviders, type AccountOptions } from './accounts.ts';
+import { matchMinutes } from '../src/store.ts';
 
 const DELAY = 6; // input delay in ticks (100 ms at 60 Hz)
 const MAX_AHEAD = 600; // 10 s of buffered inputs before we give up on a lagging peer
@@ -41,8 +42,11 @@ export function startServer(port: number, opts: AccountOptions = {}): Server {
     const [a, b] = [host.ws, guest.ws];
     const m: Match = { players: [a, b], inputs: [new Map(), new Map()], next: 0, hashes: new Map() };
     const seed = randomInt(1, 2 ** 32 - 1);
-    // The host's settings win; the guest only brings its team. Clients validate what they receive.
-    const config = { ...host.config, home: host.config.team, away: guest.config.team };
+    // The host's settings win, except the match length: each player proposes one and a disagreement
+    // is settled by a draw between the two. Clients validate what they receive.
+    const [hm, gm] = [host.config.minutes, guest.config.minutes].map(matchMinutes);
+    const minutes = hm === gm ? hm : [hm, gm][randomInt(2)];
+    const config = { ...host.config, minutes, minutesDrawn: hm !== gm, home: host.config.team, away: guest.config.team };
     m.players.forEach((p, side) => { matches.set(p, m); lobbyOf.delete(p); send(p, { t: 'start', seed, side, delay: DELAY, config }); });
     log('nowy mecz, ziarno', seed, '— aktywnych meczów:', new Set(matches.values()).size);
   }

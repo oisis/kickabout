@@ -2,7 +2,7 @@
 import { FORMATIONS, PITCHES, CMD_SUB, CMD_TACTIC, cmd, lineOf, type State } from './sim.ts';
 import { TEAMS, POS, LEAGUE_COUNTRIES, leagueLabel, type TeamDef, team, rating, pickLineup, sanitizeTeam, teamSetup } from './data.ts';
 import { type MatchRun, type Side, makeSpec, choosePitch } from './match.ts';
-import { type Options, options, saveOptions, highlights, deleteHighlight, addHighlights, download, upload, customTeams, customTactics, type Highlight } from './store.ts';
+import { type Options, options, saveOptions, minuteOptions, MATCH_MINUTES, highlights, deleteHighlight, addHighlights, download, upload, customTeams, customTactics, type Highlight } from './store.ts';
 import { statRows } from './render.ts';
 import { Net, savedServer, serverUrl, siteUrl } from './net.ts';
 import { h, show, title, btn, row, back, select, toggle, input, table, toast } from './ui.ts';
@@ -26,7 +26,7 @@ export function mainMenu(app: App) {
       // The app opens it in the system browser (Capacitor hands off external URLs).
       siteUrl() && btn(tr('Strona www i konto'), () => { location.href = siteUrl(); }, 'ghost'),
     ),
-    h('p', { className: 'hint' }, tr('Dotyk: lewa strona – bieg, prawa – podanie/strzał (przytrzymaj = mocniej), bez piłki – wślizg. Klawiatura: strzałki + spacja (gracz 2: WASD + F). Pad: drążek + A, Start = pauza.')),
+    h('p', { className: 'hint' }, tr('Dotyk: lewa strona – bieg, po prawej PODANIE i STRZAŁ (przytrzymaj = mocniej), bez piłki – wślizg. Klawiatura: strzałki, spacja = podanie, M = strzał (gracz 2: WASD, F = podanie, G = strzał). Pad: drążek, A = podanie, B = strzał, Start = pauza.')),
   );
 }
 
@@ -69,7 +69,7 @@ export function optionsScreen(app: App) {
   const set = <K extends keyof Options>(k: K) => (v: Options[K]) => { o[k] = v; saveOptions(o); app.applyOptions(); };
   show(
     title(tr('Opcje')),
-    select(tr('Długość meczu'), o.minutes, [[3, '3 min'], [5, '5 min'], [7, '7 min'], [10, '10 min']], set('minutes')),
+    select(tr('Długość meczu'), o.minutes, minuteOptions(), set('minutes')),
     toggle(tr('Dogrywka przy remisie'), o.extraTime, set('extraTime')),
     toggle(tr('Rzuty karne przy remisie'), o.penalties, set('penalties')),
     select(tr('Murawa (domyślna)'), o.pitch, pitchOptions(), set('pitch')),
@@ -228,11 +228,12 @@ function online(app: App) {
     select(tr('Twoja drużyna'), state.team, teamOptions(), (v) => { state.team = v; }),
     select(tr('Tryb'), state.mode, [['quick', tr('Szybka gra — losowy przeciwnik')], ['host', tr('Załóż pokój dla znajomego')], ['join', tr('Dołącz do pokoju znajomego')]], (v) => { state.mode = v; draw(); }),
     state.mode === 'join' && input(tr('Kod pokoju'), state.code, (v) => { state.code = v.toUpperCase(); }, { maxLength: 4, autocapitalize: 'characters' }),
-    state.mode !== 'join' && select(tr('Długość meczu'), state.minutes, [[3, '3 min'], [5, '5 min'], [7, '7 min'], [10, '10 min']], (v) => { state.minutes = v; }),
+    // Both players propose a length; when they differ the server draws one of the two.
+    select(tr('Długość meczu'), state.minutes, minuteOptions(), (v) => { state.minutes = v; }),
     state.mode !== 'join' && select(tr('Murawa'), state.pitch, pitchOptions(), (v) => { state.pitch = v; }),
     state.mode !== 'join' && toggle(tr('Dogrywka przy remisie'), state.extraTime, (v) => { state.extraTime = v; }),
     state.mode !== 'join' && toggle(tr('Rzuty karne przy remisie'), state.penalties, (v) => { state.penalties = v; }),
-    h('p', { className: 'hint' }, tr('W szybkiej grze obowiązują ustawienia gracza, który czekał pierwszy.')),
+    h('p', { className: 'hint' }, tr('Murawę i zasady ustala gracz, który czekał pierwszy (założyciel pokoju). Gdy wybierzecie różną długość meczu, zostanie wylosowana jedna z dwóch.')),
     row(back(() => app.menu()), btn(tr('Połącz'), () => {
       if (!state.address.trim()) return toast(tr('Podaj adres serwera'));
       if (state.mode === 'join' && state.code.length !== 4) return toast(tr('Kod pokoju ma 4 litery'));
@@ -249,7 +250,8 @@ function online(app: App) {
 function onlineSpec(net: Net) {
   const c = net.config, side = net.side;
   const home = sanitizeTeam(c.home) ?? TEAMS[0], away = sanitizeTeam(c.away) ?? TEAMS[1];
-  const minutes = [3, 5, 7, 10].includes(c.minutes as number) ? (c.minutes as number) : 3;
+  const minutes = MATCH_MINUTES.includes(c.minutes as number) ? (c.minutes as number) : MATCH_MINUTES[0];
+  if (c.minutesDrawn) toast(tr('Różne długości meczu — wylosowano {0} min', minutes));
   const pitch = Number.isInteger(c.pitch) && (c.pitch as number) >= 0 && (c.pitch as number) < 7 ? (c.pitch as number) : 4;
   const spec = makeSpec({ team: home, human: side === 0 ? 1 : 0 }, { team: away, human: side === 1 ? 1 : 0 },
     { ...options(), pitch, autoReplay: false }, { minutes, extraTime: c.extraTime === true, penalties: c.penalties === true }, net.seed);
