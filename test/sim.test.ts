@@ -187,3 +187,19 @@ test('after a goal the ball stays inside the net', () => {
     assert.equal(s.score[0] + s.score[1], 1, `vx ${vx}: a goal`);
   }
 });
+
+test('a keeper holding the ball never loses it straight to an opponent: he throws to a free mate or kicks it long', () => {
+  let releases = 0;
+  for (let seed = 1; seed <= 3; seed++) {
+    const s = newMatch(seed, setup({ minutes: 3 }));
+    while (s.phase !== 'end') {
+      const held = s.ownerIdx === 0 ? s.ownerTeam : -1;
+      step(s, [cpuInput(s, 0), cpuInput(s, 1)]);
+      if (held >= 0 && !(s.ownerTeam === held && s.ownerIdx === 0) && s.phase === 'play') {
+        releases++;
+        assert.notEqual(s.ownerTeam, 1 - held, `seed ${seed} frame ${s.frame}: the ball went from the keeper's hands to an opponent`);
+      }
+    }
+  }
+  assert.ok(releases > 0, 'keepers did release the ball');
+});

@@ -14,6 +14,7 @@ const ADB = `${process.env.ANDROID_HOME ?? `${process.env.HOME}/Android/Sdk`}/pl
 const SERVER = process.env.SERVER ?? '10.0.2.2:8787'; // e.g. 172.16.0.10:30080/ws for the K3s deployment
 const SHOTS = process.env.SHOTS ?? '/tmp/kickabout-human';
 const [SERIAL_A = 'emulator-5554', SERIAL_B = 'emulator-5556'] = process.argv.slice(2);
+const TACTIC = `Skrzydła ${Date.now().toString(36).slice(-3).toUpperCase()}`; // unique per run
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const think = () => sleep(350 + Math.random() * 600); // a human glances at the screen before each tap
 const adb = (serial: string, ...args: string[]) => execFileSync(ADB, ['-s', serial, ...args], { encoding: 'utf8' });
@@ -125,24 +126,37 @@ class Device {
   fingerprint() { return this.js<string>(`JSON.stringify({ ...kickabout.app.run.s, frame: 0, prevInput: [0, 0], eventFrame: 0 })`).then((j) => createHash('sha256').update(j).digest('hex').slice(0, 16)); }
 }
 
-/** A thumb on the stick (left) and taps on PASS or holds on SHOT (right); without the ball either one slides. */
+/**
+ * A thumb on the stick (left) and PASS / SHOT (right), played like a person watching the screen:
+ * without the ball run to it (and slide in when an opponent has it close by); with the ball dribble
+ * towards the opponents' goal, pass now and then, and shoot from about 20 m. Reads the match state
+ * through the test hook (what a player sees), a few times a second.
+ */
 function startPlaying(d: Device) {
   let alive = true, down = false;
   (async () => {
     const stick = { x: 103, y: 640, id: 1 }, shot = { x: 411 - 78, y: 914 - 100, id: 2 }, pass = { x: 411 - 190, y: 914 - 62, id: 2 };
+    const look = `(() => { const r = kickabout.app.run, s = r?.s; if (!s || s.phase === 'end') return null;
+      const me = r.me, p = s.teams[me][s.controlled[me]], b = s.ball, M = 1024, gy = s.sides[me] === -1 ? 0 : 105 * M;
+      const own = s.ownerTeam === me && s.ownerIdx === s.controlled[me];
+      const opp = s.ownerTeam === 1 - me ? s.teams[s.ownerTeam][s.ownerIdx] : null;
+      return { own, play: s.phase === 'play' && !s.paused, tx: own ? 34 * M - p.x : b.x + b.vx * 8 - p.x, ty: own ? gy - p.y : b.y + b.vy * 8 - p.y,
+        goal: Math.hypot(34 * M - p.x, gy - p.y) / M, near: opp ? Math.hypot(opp.x - p.x, opp.y - p.y) / M : 99 }; })()`;
     while (alive) {
       try {
-        const a = Math.random() * Math.PI * 2, r = 30 + Math.random() * 30;
-        const moved = { ...stick, x: stick.x + Math.cos(a) * r, y: stick.y + Math.sin(a) * r };
+        const v = await d.js<{ own: boolean; play: boolean; tx: number; ty: number; goal: number; near: number } | null>(look);
+        if (!v) { await sleep(400); continue; }
+        const a = Math.atan2(v.ty, v.tx) + (Math.random() - 0.5) * (v.own ? 0.9 : 0.4); // a human is not exact
+        const moved = { ...stick, x: stick.x + Math.cos(a) * 45, y: stick.y + Math.sin(a) * 45 };
         if (!down) { await d.touch('touchStart', [stick]); down = true; }
         await d.touch('touchMove', [moved]);
-        if (Math.random() < 0.45) {
-          const b = Math.random() < 0.5 ? pass : shot;
-          await d.touch('touchStart', [moved, b]);
-          await sleep(b === pass ? 60 : 100 + Math.random() * 450);
-          await d.touch('touchEnd', [b]);
-        }
-        await sleep(300 + Math.random() * 700);
+        // CDP lists the fingers still down after the event: the thumb stays on the stick when the button is let go
+        const press = async (b: typeof pass, ms: number) => { await d.touch('touchStart', [moved, b]); await sleep(ms); await d.touch('touchEnd', [moved]); };
+        if (v.play && v.own && v.goal < 22) await press(shot, 220 + Math.random() * 250);
+        else if (v.play && v.own && Math.random() < 0.08) await press(pass, 60);
+        else if (v.play && !v.own && v.near < 1.6 && Math.random() < 0.35) await press(pass, 60); // slide tackle
+        else if (!v.play && Math.random() < 0.3) await press(pass, 60); // take the restart
+        await sleep(120 + Math.random() * 120);
       } catch { /* screen changing */ }
     }
     if (down) await d.touch('touchEnd', []).catch(() => {});
@@ -206,7 +220,7 @@ async function editTeam(d: Device, teamName: string, newName: string, short: str
 async function newTactic(d: Device) {
   await d.choose('Nowa taktyka na bazie', '4-3-3');
   await sleep(500);
-  await d.type('Nazwa', 'Atak skrzydłami');
+  await d.type('Nazwa', TACTIC);
   // Drag the two wingers wider and higher with a finger-like mouse drag.
   for (const [i, dx, dy] of [[10, -40, -40], [9, 40, -40]] as const) {
     const p = await d.js<{ x: number; y: number }>(`(() => { const r = document.querySelectorAll('#ui .dot')[${i}].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
@@ -217,7 +231,7 @@ async function newTactic(d: Device) {
   d.snap('edytor-taktyki');
   await d.tap('Zapisz taktykę');
   const tac = await d.js<any[]>(`JSON.parse(localStorage.getItem('kickabout.tactics') || '[]')`);
-  check(`${d.name}: custom tactic saved`, tac.length === 1 && tac[0].name === 'Atak skrzydłami', tac.map((x) => x.name).join());
+  check(`${d.name}: custom tactic saved`, tac.some((x) => x.name === TACTIC), tac.map((x) => x.name).join()); // app data may hold earlier runs' tactics
   await d.tap('← Wstecz');
 }
 
@@ -228,7 +242,7 @@ async function friendly(d: Device, home: string, away: string) {
   await d.choose('Goście', away, true);
   await d.choose('Murawa', 'Zależna od pory roku');
   await d.tap('Skład i taktyka gospodarzy');
-  await d.choose('Taktyka', 'Atak skrzydłami');
+  await d.choose('Taktyka', TACTIC);
   await d.tap('Jan Kopacz', { sel: 'tbody tr', translate: false }); // swap him with the first bench player
   await d.js(`document.querySelectorAll('#ui tbody tr')[11].scrollIntoView({ block: 'center' })`);
   const r = await d.js<{ x: number; y: number }>(`(() => { const b = document.querySelectorAll('#ui tbody tr')[11].getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
@@ -587,8 +601,8 @@ async function main() {
   await B.tap(await B.js<string>(`document.querySelectorAll('#ui tbody tr')[9].textContent.trim()`), { sel: 'tbody tr', translate: false });
   await B.tap(await B.js<string>(`document.querySelectorAll('#ui tbody tr')[12].textContent.trim()`), { sel: 'tbody tr', translate: false });
   B.snap('zmiana');
-  await waitFor('3: substitution on both', 5_000, async () => (await A.state()).subsLeft[1] === 2 && (await B.state()).subsLeft[1] === 2);
-  check('3: substitution on both', (await A.state()).subsLeft[1] === 2);
+  await waitFor('3: substitution on both', 5_000, async () => (await A.state()).subsLeft[1] === 4 && (await B.state()).subsLeft[1] === 4);
+  check('3: substitution on both', (await A.state()).subsLeft[1] === 4);
   await B.tap('Gotowe'); await B.tap('Wznów');
   await waitFor('3: resumed on both', 5_000, async () => !(await A.state()).paused && !(await B.state()).paused);
   await bothFinish('online-pokoj', A, B);

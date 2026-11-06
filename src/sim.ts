@@ -104,6 +104,8 @@ export interface State {
   prevInput: number[];
   hold: number[];
   keeperHold: number;
+  /** Frames left in which only the keeper's team may take the ball he just threw or kicked. */
+  release: number;
   paused: boolean;
   squads: Skills[][];
   bench: number[][];
@@ -169,7 +171,7 @@ export function newMatch(seed: number, setup: MatchSetup): State {
     restart: null, pk: null, so: null, score: [0, 0], teams: [],
     ball: { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 },
     ownerTeam: -1, ownerIdx: -1, lastTouch: 0, lastIdx: STRIKER, controlled: [STRIKER, STRIKER],
-    prevInput: [0, 0], hold: [0, 0], keeperHold: 0, paused: false,
+    prevInput: [0, 0], hold: [0, 0], keeperHold: 0, release: 0, paused: false,
     squads: setup.teams.map((t) => t.squad.map((p) => ({ ...p }))),
     bench: setup.teams.map((t) => t.squad.map((_, i) => i).filter((i) => !t.lineup.includes(i))),
     subsLeft: [5, 5], subWindows: [3, 3], subTick: [-1, -1],
@@ -639,11 +641,22 @@ function keeper(s: State, t: number) {
   if (s.ownerTeam === t && s.ownerIdx === 0) {
     k.vx = k.vy = 0; k.fx = 0; k.fy = a * 1000;
     if (++s.keeperHold > 55) {
-      const outfield = s.teams[t].filter((q, i) => i > 0 && !q.off && s.tactics[t][s.tactic[t]][i][1] >= 400);
-      const q = outfield.length ? outfield[rnd(s, outfield.length)] : s.teams[t][1];
-      const dx = q.x - k.x, dy = q.y - k.y, d = isqrt(dx * dx + dy * dy) || 1;
-      b.vx = div(dx * 430, d); b.vy = div(dy * 430, d); b.vz = 95;
+      // Throw to the most forward team-mate nobody marks (no opponent within 7 m, at most 35 m away);
+      // with nobody free, kick it long and high upfield. Never just drop it at the feet of a forward.
+      const opp = s.teams[1 - t].filter((o) => !o.off);
+      let best: Player | null = null;
+      for (const q of s.teams[t].slice(1)) {
+        if (q.off || q.down || dist2(q, k.x, k.y) > 35 * M * 35 * M || dist2(q, k.x, k.y) < 6 * M * 6 * M) continue;
+        if (opp.some((o) => dist2(o, q.x, q.y) < 7 * M * 7 * M)) continue;
+        if (!best || (q.y - best.y) * a > 0) best = q;
+      }
+      const tx = best ? best.x + best.ax * 20 : clamp(k.x + rnd(s, 16 * M + 1) - 8 * M, 8 * M, W - 8 * M), ty = best ? best.y + best.ay * 20 : k.y + a * 42 * M;
+      const dx = tx - k.x, dy = ty - k.y, d = isqrt(dx * dx + dy * dy) || 1;
+      const speed = best ? clamp(div(d * 16, 1000) + 60, 200, 480) : 400;
+      b.x = k.x + div(dx * 600, d); b.y = k.y + div(dy * 600, d); // released in front of him, not at his feet
+      b.vx = div(dx * speed, d); b.vy = div(dy * speed, d); b.vz = best ? 60 : 170;
       s.ownerTeam = s.ownerIdx = -1; s.lastTouch = t; s.lastIdx = 0; k.cool = 12; s.keeperHold = 0; // just long enough not to catch his own throw
+      s.release = 24;
     }
     return;
   }
@@ -742,6 +755,7 @@ function foul(s: State, t: number, slider: Player, victim: Player) {
 
 function contest(s: State) {
   const b = s.ball;
+  if (s.release) s.release--;
   keeperSave(s, 0);
   keeperSave(s, 1);
   const keeperHasBall = s.ownerIdx === 0;
@@ -776,6 +790,7 @@ function contest(s: State) {
     for (let t = 0; t < 2; t++) {
       for (let i = 1; i < 11; i++) {
         const p = s.teams[t][i], d = dist2(p, b.x, b.y);
+        if (s.release && t !== s.lastTouch) continue; // the keeper's release: opponents must wait
         if (active(p) && !p.down && !p.slide && !p.cool && d < bd) { bd = d; bt = t; bi = i; }
       }
     }
@@ -787,6 +802,7 @@ function header(s: State) {
   const b = s.ball;
   let bt = -1, bi = -1, bd = 600 * 600;
   for (let t = 0; t < 2; t++) {
+    if (s.release && t !== s.lastTouch) continue; // no heading the keeper's kick right off his boot
     for (let i = 1; i < 11; i++) {
       const p = s.teams[t][i], d = dist2(p, b.x, b.y);
       if (active(p) && !p.down && !p.slide && !p.cool && d < bd) { bd = d; bt = t; bi = i; }
