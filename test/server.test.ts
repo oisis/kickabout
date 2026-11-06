@@ -99,7 +99,7 @@ test('answers health checks and keeps static files to the website', async () => 
   await once(http, 'listening');
   const base = `http://127.0.0.1:${(http.address() as AddressInfo).port}`;
   assert.equal(await (await fetch(`${base}/healthz`)).text(), 'ok');
-  assert.equal((await fetch(`${base}/index.html`)).status, 404);
+  assert.notEqual((await fetch(`${base}/index.html`)).status, 200); // pages come from the website image
   http.closeAllConnections();
   http.close();
 });

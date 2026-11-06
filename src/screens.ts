@@ -1,6 +1,6 @@
 // Menu screens. Each function renders one screen into the #ui overlay.
 import { FORMATIONS, PITCHES, CMD_SUB, CMD_TACTIC, cmd, lineOf, type State } from './sim.ts';
-import { TEAMS, POS, LEAGUE_COUNTRIES, leagueLabel, type TeamDef, team, rating, pickLineup, sanitizeTeam, teamSetup } from './data.ts';
+import { TEAMS, POS, LEAGUE_COUNTRIES, leagueLabel, type TeamDef, team, rating, pickLineup, onlineMatch } from './data.ts';
 import { type MatchRun, type Side, makeSpec, choosePitch } from './match.ts';
 import { type Options, options, saveOptions, minuteOptions, MATCH_MINUTES, highlights, deleteHighlight, addHighlights, download, upload, customTeams, customTactics, type Highlight } from './store.ts';
 import { statRows } from './render.ts';
@@ -249,13 +249,10 @@ function online(app: App) {
 /** Both peers must build the same match from the server's config: presets only, validated input. */
 function onlineSpec(net: Net) {
   const c = net.config, side = net.side;
-  const home = sanitizeTeam(c.home) ?? TEAMS[0], away = sanitizeTeam(c.away) ?? TEAMS[1];
-  const minutes = MATCH_MINUTES.includes(c.minutes as number) ? (c.minutes as number) : MATCH_MINUTES[0];
-  if (c.minutesDrawn) toast(tr('Różne długości meczu — wylosowano {0} min', minutes));
-  const pitch = Number.isInteger(c.pitch) && (c.pitch as number) >= 0 && (c.pitch as number) < 7 ? (c.pitch as number) : 4;
-  const spec = makeSpec({ team: home, human: side === 0 ? 1 : 0 }, { team: away, human: side === 1 ? 1 : 0 },
-    { ...options(), pitch, autoReplay: false }, { minutes, extraTime: c.extraTime === true, penalties: c.penalties === true }, net.seed);
-  spec.setup.teams = [teamSetup(home), teamSetup(away)];
+  const { home, away, setup } = onlineMatch(c);
+  if (c.minutesDrawn) toast(tr('Różne długości meczu — wylosowano {0} min', setup.minutes));
+  const spec = makeSpec({ team: home, human: side === 0 ? 1 : 0 }, { team: away, human: side === 1 ? 1 : 0 }, { ...options(), autoReplay: false }, {}, net.seed);
+  spec.setup = setup; // exactly what the other peer and the server simulate
   spec.net = net;
   return spec;
 }

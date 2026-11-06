@@ -2,8 +2,9 @@
 // generated deterministically so every device and both online peers build
 // byte-identical teams from the same id. Club names pair a real city with an
 // invented nickname; players are fictional.
-import { type Skills, type TeamSetup, FORMATIONS, lineOf } from './sim.ts';
+import { type Skills, type TeamSetup, type MatchSetup, FORMATIONS, lineOf } from './sim.ts';
 import { t } from './i18n.ts';
+import { MATCH_MINUTES } from './store.ts';
 
 export interface PlayerDef extends Skills { name: string; age: number }
 export interface Kit { shirt: string; shorts: string }
@@ -19,6 +20,7 @@ export interface TeamDef {
   keeper: string;
   formation: number; // index into FORMATIONS
   players: PlayerDef[]; // 16: 2 GK, 5 DEF, 5 MID, 4 ATT
+  sponsors?: string[]; // online clubs: top sponsors' names, shown before kick-off and on the boards
 }
 
 export const POS = ['BR', 'OB', 'PO', 'NA']; // bramkarz, obrońca, pomocnik, napastnik (translated on display)
@@ -236,5 +238,17 @@ export function sanitizeTeam(x: unknown): TeamDef | null {
   return {
     id: str(d.id, 20), name: str(d.name, 32) || '?', short: str(d.short, 3) || '???', national: !!d.national, country: str(d.country, 8), division: n(d.division, 2), level: n(d.level, 9),
     kits: [kit(d.kits?.[0]), kit(d.kits?.[1])], keeper: COLOR.test(d.keeper ?? '') ? d.keeper : '#22c55e', formation: n(d.formation, FORMATIONS.length - 1), players,
+    sponsors: Array.isArray(d.sponsors) ? d.sponsors.slice(0, 3).map((x) => str(x, 24)) : [],
   };
+}
+
+/**
+ * The match both online peers (and the server, to pay prize money) build from the server's
+ * config: validated teams and settings, default lineups and preset tactics only.
+ */
+export function onlineMatch(c: Record<string, unknown>): { home: TeamDef; away: TeamDef; setup: MatchSetup } {
+  const home = sanitizeTeam(c.home) ?? TEAMS[0], away = sanitizeTeam(c.away) ?? TEAMS[1];
+  const minutes = MATCH_MINUTES.includes(c.minutes as number) ? (c.minutes as number) : MATCH_MINUTES[0];
+  const pitch = Number.isInteger(c.pitch) && (c.pitch as number) >= 0 && (c.pitch as number) < 7 ? (c.pitch as number) : 4;
+  return { home, away, setup: { teams: [teamSetup(home), teamSetup(away)], minutes, extraTime: c.extraTime === true, penalties: c.penalties === true, pitch } };
 }

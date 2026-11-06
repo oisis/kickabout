@@ -15,11 +15,12 @@ export class Net {
   seed = 1;
   delay = 6;
   frames = new Map<number, [number, number]>();
+  reward: number | null = null; // prize money the server paid after a club match
   onStart = () => {};
   private ws: WebSocket;
 
-  /** room: undefined = quick match, 'new' = create a private room, or a room code to join. */
-  constructor(url: string, join: { room?: string; config: Record<string, unknown> } = { config: {} }) {
+  /** room: undefined = quick match, 'new' = create a private room, or a room code to join; token: the app's account (club matches). */
+  constructor(url: string, join: { room?: string; config: Record<string, unknown>; token?: string } = { config: {} }) {
     this.ws = new WebSocket(url);
     this.ws.onopen = () => this.send({ t: 'join', ...join });
     this.ws.onmessage = (e) => { try { this.receive(JSON.parse(String(e.data))); } catch { /* ignore malformed */ } };
@@ -27,7 +28,7 @@ export class Net {
     this.ws.onclose = () => { this.message ||= t('Połączenie zerwane'); this.status = 'closed'; };
   }
 
-  private receive(m: { t: string; seed?: number; side?: number; delay?: number; k?: number; b?: number[]; why?: string; room?: string; code?: string; config?: Record<string, unknown> }) {
+  private receive(m: { t: string; seed?: number; side?: number; delay?: number; k?: number; b?: number[]; why?: string; room?: string; code?: string; config?: Record<string, unknown>; amount?: number }) {
     if (m.t === 'wait') this.status = 'waiting';
     else if (m.t === 'room') { this.status = 'room'; this.room = String(m.code ?? ''); }
     else if (m.t === 'start') {
@@ -37,6 +38,7 @@ export class Net {
       for (let k = 0; k < this.delay; k++) this.input(k, 0);
       this.onStart();
     } else if (m.t === 'f' && Number.isInteger(m.k)) this.frames.set(m.k!, [m.b![0] & 0xffffff, m.b![1] & 0xffffff]); // controls + commands
+    else if (m.t === 'reward') this.reward = Number(m.amount) || 0;
     else if (m.t === 'bye') { this.message = t(BYE[m.why ?? ''] ?? BYE.unknown, String(m.room ?? '')); this.status = 'closed'; }
   }
 

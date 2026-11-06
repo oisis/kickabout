@@ -48,7 +48,7 @@ test('OAuth sign-in, linking a second provider, sessions and account deletion', 
   await b('/api/auth/google');
   assert.match((await b('/api/auth/google/callback?code=abc&state=forged')).headers.get('location')!, /error=state/);
 
-  assert.equal((await signIn('google')).headers.get('location'), '/account.html');
+  assert.equal((await signIn('google')).headers.get('location'), 'http://kickabout.test/account.html');
   let me = await (await b('/api/me')).json();
   assert.equal(me.name, 'Ala Kowalska');
   assert.deepEqual(me.identities.map((i: any) => i.provider), ['google']);
@@ -78,7 +78,7 @@ test('OAuth sign-in, linking a second provider, sessions and account deletion', 
   assert.equal((await b('/api/me', { method: 'DELETE' })).status, 200);
   assert.equal((await b('/api/me')).status, 401);
   const again = await signIn('github'); // the identity was deleted with the account: a fresh one
-  assert.equal(again.headers.get('location'), '/account.html');
+  assert.equal(again.headers.get('location'), 'http://kickabout.test/account.html');
   assert.equal((await (await b('/api/me')).json()).name, 'Ala Kowalska');
 
   for (const s of [http, fake]) { s.closeAllConnections(); s.close(); }
