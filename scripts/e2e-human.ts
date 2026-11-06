@@ -488,6 +488,46 @@ async function webPhase(A: Device) {
   log('   WYNIK ' + s.score?.join(':') + ' tick ' + s.tick);
 }
 
+/** A real account's club on phone A (CODE_A) hosts a visible room, B joins without a club; meanwhile
+ *  browsers start more matches, so the fan zone lists several at once. */
+async function multiPhase(A: Device, B: Device) {
+  const code = process.env.CODE_A ?? '';
+  if (!code) { check('multi: CODE_A from the website account page', false); return; }
+  log('13. Klub online z prawdziwego konta na A');
+  for (let i = 0; i < 3 && !(await A.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await A.tap('← Wstecz').catch(() => A.tap('OK')).catch(() => {});
+  await A.tap('Mój klub (online)'); await sleep(2000);
+  if ((await A.screenText()).includes(A.t('Połącz z kontem'))) {
+    await A.type('Kod z panelu konta', code);
+    await A.tap('Połącz z kontem'); await sleep(2500);
+  }
+  if ((await A.screenText()).includes(A.t('Załóż klub'))) {
+    await A.type('Nazwa klubu', process.env.CLUB_A ?? 'Kickabout Test FC');
+    await A.type('Skrót (3 litery)', 'KTF');
+    await A.tap('Załóż klub', { sel: 'button' }); await sleep(2500);
+  }
+  const text = await A.screenText();
+  A.snap('klub-konto');
+  const coins = await coinsOnScreen(A);
+  check('13: A signed in with the club', text.includes(A.t('Historia konta')), `${text.split('\n')[0]} — ${coins} 🪙`);
+  await goOnline(A, 'host', 'London Navigators', '', false, true, false, true);
+  await waitFor('13: room created', 15_000, async () => (await A.state()).status === 'room');
+  await goOnline(B, 'join', 'Leeds Sentinels', (await A.state()).room);
+  await waitFor('13: club match starts', 20_000, async () => (await A.state()).status === 'playing' && (await B.state()).status === 'playing');
+  log('   MECZ KLUBOWY NA ŻYWO: ' + (await A.state()).names?.join(' – '));
+  await bothFinish('multi-klub', A, B, false);
+  await sleep(2000);
+  const reward = await A.js<number>(`kickabout.app.run?.spec.net?.reward ?? -1`).catch(() => -1);
+  check('13: the club owner got prize money', reward > 0, `${reward} 🪙`);
+  A.snap('multi-nagroda');
+  await A.tap('Dalej').catch(() => {}); await B.tap('Dalej').catch(() => {});
+  await sleep(1500);
+  for (let i = 0; i < 3 && !(await A.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await A.tap('← Wstecz').catch(() => A.tap('OK')).catch(() => {});
+  await A.tap('Mój klub (online)'); await sleep(2500);
+  const after = await coinsOnScreen(A);
+  check('13: club balance grew', after > coins, `${coins} → ${after}`);
+  A.snap('klub-po-meczu');
+}
+
 async function main() {
   execFileSync('mkdir', ['-p', SHOTS]);
   const A = new Device('A', SERIAL_A, 9401), B = new Device('B', SERIAL_B, 9402);
@@ -500,6 +540,7 @@ async function main() {
     if (phases.includes('voice')) await voicePhase(A, B);
     if (phases.includes('fans')) await fansPhase(A, B);
     if (phases.includes('web')) await webPhase(A);
+    if (phases.includes('multi')) await multiPhase(A, B);
     return finish();
   }
 

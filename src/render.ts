@@ -232,10 +232,10 @@ function pentagon(ctx: CanvasRenderingContext2D, x: number, y: number, r: number
   ctx.closePath(); ctx.fill();
 }
 
-function text(ctx: CanvasRenderingContext2D, str: string, x: number, y: number, size: number, color = '#fff') {
+function text(ctx: CanvasRenderingContext2D, str: string, x: number, y: number, size: number, color = '#fff', maxW?: number) {
   ctx.font = `800 ${size}px system-ui, sans-serif`;
-  ctx.lineJoin = 'round'; ctx.lineWidth = size / 6; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(str, x, y);
-  ctx.fillStyle = color; ctx.fillText(str, x, y);
+  ctx.lineJoin = 'round'; ctx.lineWidth = size / 6; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.strokeText(str, x, y, maxW);
+  ctx.fillStyle = color; ctx.fillText(str, x, y, maxW);
 }
 
 function hud(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, cw: number, ch: number, dpr: number, view: View) {
@@ -245,9 +245,10 @@ function hud(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, cw: numbe
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(u * 0.4, u * 0.4, u * 8.4, u * 1.3);
   ctx.textAlign = 'left';
-  text(ctx, info.shorts[0], u * 0.7, u * 1.05, u * 0.75, info.kits[0].shirt);
-  text(ctx, `${s.score[0]}:${s.score[1]}`, u * 2.6, u * 1.05, u * 0.75);
-  text(ctx, info.shorts[1], u * 4.1, u * 1.05, u * 0.75, info.kits[1].shirt);
+  // wide letters (MAN, WWW) or a two-digit score must not run into the next slot
+  text(ctx, info.shorts[0], u * 0.7, u * 1.05, u * 0.75, info.kits[0].shirt, u * 1.7);
+  text(ctx, `${s.score[0]}:${s.score[1]}`, u * 2.6, u * 1.05, u * 0.75, '#fff', u * 1.35);
+  text(ctx, info.shorts[1], u * 4.1, u * 1.05, u * 0.75, info.kits[1].shirt, u * 1.8);
   text(ctx, clock, u * 6.1, u * 1.05, u * 0.65);
 
   // Pause button (top right); spectators cannot pause
