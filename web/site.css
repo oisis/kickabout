@@ -16,6 +16,8 @@ header.top .wrap { display: flex; align-items: center; gap: 16px; height: 60px; 
 header nav { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 header nav a { color: var(--fg); text-decoration: none; font-weight: 600; }
 header nav a:hover { color: var(--accent); }
+header nav .online { font-size: 13px; font-weight: 700; color: #4ade80; white-space: nowrap; }
+header nav .online::before { content: '●'; margin-right: 5px; }
 .lang { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; font: inherit; }
 .avatar { width: 28px; height: 28px; border-radius: 50%; vertical-align: middle; object-fit: cover; background: var(--bg2); }
 
@@ -89,7 +91,32 @@ ul.rows .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis
 .notice.ok { background: #14361f; border-color: #4ade80; }
 [hidden] { display: none !important; }
 
+/* Administration */
+.admin { max-width: 1040px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.stats .card { padding: 14px 16px; }
+.stats .big { font: 800 28px system-ui, sans-serif; }
+.users { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.users li { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
+.users li.banned { border-color: var(--danger); opacity: 0.8; }
+.users img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: var(--bg2); }
+.users .who { min-width: 0; overflow-wrap: anywhere; }
+.users .who small { display: block; color: var(--muted); }
+.users .acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.users .btn, .admin .small { padding: 7px 12px; font-size: 14px; }
+.tag.red { background: var(--danger); color: #1c1917; }
+.tag.grey { background: var(--line); color: var(--fg); }
+.emails { font: 14px ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; margin: 10px 0 0; padding: 12px; background: #0b2a17; border-radius: 10px; border: 1px solid var(--line); }
+@media (max-width: 620px) { .users li { grid-template-columns: 40px 1fr; } .users .acts { grid-column: 1 / -1; justify-content: flex-start; } }
+
 @media (max-width: 720px) {
   .hero .wrap { grid-template-columns: 1fr; padding-top: 36px; }
   header nav .hide-sm { display: none; }
+}
+@media (max-width: 480px) {
+  header.top .wrap { flex-wrap: wrap; height: auto; gap: 4px 10px; padding-top: 8px; padding-bottom: 8px; }
+  .brand { font-size: 19px; white-space: nowrap; }
+  header nav { gap: 12px; font-size: 14px; margin-left: 0; width: 100%; justify-content: space-between; }
+  header nav a { white-space: nowrap; }
+  .avatar { width: 24px; height: 24px; }
 }

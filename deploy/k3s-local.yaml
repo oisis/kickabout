@@ -5,6 +5,7 @@ publicUrl: http://172.16.0.10:30080
 api:
   image: { repository: 127.0.0.1:30500/kickabout-api, tag: dev, pullPolicy: Always }
   devLogin: true
+  adminEmails: [admin@kickabout.test]
 web:
   image: { repository: 127.0.0.1:30500/kickabout-web, tag: dev, pullPolicy: Always }
   replicas: 1

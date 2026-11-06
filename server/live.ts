@@ -77,6 +77,8 @@ export function live() {
         score: m.sim.score, minute: minute(m.sim), phase: m.sim.phase, period: m.sim.period, spectators: m.spectators.size,
       })).sort((a, b) => b.spectators - a.spectators || a.started - b.started);
     },
+    /** How many watch any match. */
+    watchers: () => watching.size,
     close() { clearInterval(timer); },
   };
 }

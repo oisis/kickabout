@@ -88,15 +88,18 @@ export const inApp = () => location.hostname === 'localhost' && !location.port;
 /** Runtime config of the website (web/config.js): the API's address when it has its own subdomain. */
 const site = () => (globalThis as { KICKABOUT?: { api?: string; ws?: string } }).KICKABOUT ?? {};
 
+/** The public Kickabout website: the app's default when no other address was built in. */
+const DEFAULT_SITE = 'https://kickabout.oisis.pl/';
+
 /** Last used server address; otherwise the website's own /ws (proxied to the API), or the app's build-time default. */
 export function savedServer(): string {
   let saved = '';
   try { saved = localStorage.getItem('server') ?? ''; } catch { /* storage unavailable */ }
-  return saved || (inApp() ? import.meta.env.VITE_SERVER ?? '' : site().ws || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  return saved || (inApp() ? import.meta.env.VITE_SERVER || 'kickabout.oisis.pl' : site().ws || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
 }
 
 /** The Kickabout website: the page above /play/, or (in the app) the address baked in at build time. */
-export const siteUrl = (): string => (inApp() ? import.meta.env.VITE_SITE ?? '' : new URL('../', location.href).href);
+export const siteUrl = (): string => (inApp() ? import.meta.env.VITE_SITE || DEFAULT_SITE : new URL('../', location.href).href);
 
 /** Remember an address typed by the user and turn it into a WebSocket URL. */
 export function serverUrl(address: string): string {
@@ -123,6 +126,6 @@ export const liveServer = (): string => site().ws || `${location.protocol === 'h
 
 /** Base URL of the HTTP API: the website's /api, its API subdomain, or (in the app) the build-time address. */
 export function apiBase(): string {
-  if (inApp()) return (import.meta.env.VITE_API ?? (siteUrl() ? `${siteUrl().replace(/\/$/, '')}/api` : '')).replace(/\/$/, '');
+  if (inApp()) return (import.meta.env.VITE_API || (siteUrl() ? `${siteUrl().replace(/\/$/, '')}/api` : '')).replace(/\/$/, '');
   return (site().api || new URL('../api', location.href).href).replace(/\/$/, '');
 }

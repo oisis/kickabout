@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kickabout — admin</title>
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#14532d" />
+  <link rel="icon" href="/play/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/site.css" />
+  <script src="/config.js"></script>
+  <script type="module" src="/site.js"></script>
+  <script type="module" src="/admin.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="/" aria-label="Kickabout">KICKAB<svg class="ball" viewBox="-50 -50 100 100" aria-hidden="true"><defs><clipPath id="ball-clip"><circle r="46"/></clipPath></defs><circle r="46" fill="#fff"/><g clip-path="url(#ball-clip)" fill="#111"><polygon points="0.0,-16.0 15.2,-4.9 9.4,12.9 -9.4,12.9 -15.2,-4.9"/><polygon points="0.0,-34.0 -12.4,-43.0 -7.6,-57.5 7.6,-57.5 12.4,-43.0"/><polygon points="32.3,-10.5 37.1,-25.0 52.3,-25.0 57.1,-10.5 44.7,-1.5"/><polygon points="20.0,27.5 35.3,27.5 40.0,42.0 27.6,51.0 15.3,42.0"/><polygon points="-20.0,27.5 -15.3,42.0 -27.6,51.0 -40.0,42.0 -35.3,27.5"/><polygon points="-32.3,-10.5 -44.7,-1.5 -57.1,-10.5 -52.3,-25.0 -37.1,-25.0"/><path d="M0.0 -16.0L0.0 -36.0 M15.2 -4.9L34.2 -11.1 M9.4 12.9L21.2 29.1 M-9.4 12.9L-21.2 29.1 M-15.2 -4.9L-34.2 -11.1" stroke="#333" stroke-width="2.5"/></g><circle r="46" fill="none" stroke="#111" stroke-width="4"/></svg>UT</a>
+      <nav>
+        <a href="/play/" data-i18n="nav_play">Play</a>
+        <a href="/kibic.html" data-i18n="nav_live">Fan zone</a>
+        <a href="/account.html" id="account-link" data-i18n="nav_signin">Sign in</a>
+        <select class="lang" aria-label="Language"><option value="en">EN</option><option value="pl">PL</option></select>
+      </nav>
+    </div>
+  </header>
+
+  <main class="account admin">
+    <h1 data-i18n="adm_title">Administration</h1>
+    <div class="notice" id="notice" hidden role="status"></div>
+    <p class="muted" id="denied" hidden data-i18n="adm_denied"></p>
+    <div id="panel" hidden>
+      <div class="stats" id="stats"></div>
+
+      <div class="card">
+        <h3 data-i18n="adm_add">Add a user</h3>
+        <p data-i18n="adm_add_lead"></p>
+        <form class="inline" id="add" style="margin-top:12px">
+          <input type="text" id="add-name" maxlength="40" required data-i18n-ph="adm_name" />
+          <input type="text" id="add-email" maxlength="254" required inputmode="email" autocomplete="off" data-i18n-ph="adm_email" />
+          <button class="btn primary" data-i18n="adm_add_btn">Add</button>
+        </form>
+      </div>
+
+      <h2 data-i18n="adm_users" style="margin:24px 0 8px">Accounts</h2>
+      <form class="inline" id="search"><input type="text" id="q" data-i18n-ph="adm_search" /></form>
+      <ul class="users" id="users" style="margin-top:12px"></ul>
+
+      <div class="card" style="margin-top:24px">
+        <div style="display:flex;align-items:center;gap:12px"><h3 data-i18n="adm_emails" style="flex:1">E-mail addresses</h3><button class="btn ghost small" id="copy" data-i18n="adm_copy"></button></div>
+        <pre class="emails" id="emails"></pre>
+      </div>
+    </div>
+  </main>
+  <footer><div class="wrap" data-i18n="footer"></div></footer>
+</body>
+</html>

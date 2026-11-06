@@ -9,7 +9,8 @@ import { networkInterfaces } from 'node:os';
 import { randomInt } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { IncomingMessage } from 'node:http';
-import { accounts, envProviders, type AccountOptions } from './accounts.ts';
+import { accounts, envProviders, type AccountOptions, type Route } from './accounts.ts';
+import { admin, type Online } from './admin.ts';
 import { iceServers, voiceFromEnv, MAX_SIGNAL, MAX_SIGNALS, type VoiceOptions } from './voice.ts';
 import { clubs } from './clubs.ts';
 import { live, type LiveMatch } from './live.ts';
@@ -39,15 +40,17 @@ const send = (ws: WebSocket, msg: object) => { if (ws.readyState === WebSocket.O
 const isTick = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 
 export function startServer(port: number, opts: AccountOptions & { voice?: VoiceOptions } = {}): Server {
-  let club!: ReturnType<typeof clubs>;
-  const api = accounts(opts, [(c) => club.route(c)]);
+  let club!: ReturnType<typeof clubs>, adm!: Route;
+  const api = accounts(opts, [(c) => club.route(c), (c) => adm(c)]);
   club = clubs(api.db);
+  adm = admin(api.db, api.isAdmin, () => onlineNow());
   club.sweep();
   const sweeper = setInterval(() => club.sweep(), 3600_000);
   sweeper.unref();
   const http = createServer(async (req, res) => {
     if (req.url === '/healthz') { res.writeHead(200).end('ok'); return; }
     if (req.url === '/live' || req.url === '/api/live') { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'access-control-allow-origin': '*' }).end(JSON.stringify(fans.list())); return; }
+    if (req.url === '/online' || req.url === '/api/online') { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'access-control-allow-origin': '*' }).end(JSON.stringify(onlineNow())); return; }
     if (req.url === '/version' || req.url === '/api/version') { res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }).end(JSON.stringify({ version: VERSION })); return; }
     if (!(await api.handle(req, res))) res.writeHead(404, { 'content-type': 'text/plain' }).end('Kickabout API');
   });
@@ -55,6 +58,11 @@ export function startServer(port: number, opts: AccountOptions & { voice?: Voice
   http.on('close', () => { clearInterval(sweeper); fans.close(); });
 
   const matches = new Map<WebSocket, Match>();
+  /** Everyone connected to the match server right now: players, players waiting for one, fans. */
+  const onlineNow = (): Online => {
+    const playing = matches.size, queued = (waiting ? 1 : 0) + rooms.size, watching = fans.watchers();
+    return { online: playing + queued + watching, playing, waiting: queued, watching, matches: new Set(matches.values()).size };
+  };
   // Lobby: one quick-match slot and private rooms keyed by a short code. A host's
   // match settings and each player's own team travel in the join message.
   type Lobby = { ws: WebSocket; config: Record<string, unknown>; user: number | null };
@@ -200,7 +208,7 @@ if (import.meta.main) {
   const providers = envProviders();
   startServer(port, {
     db: env.DB_PATH ?? 'kickabout.db', publicUrl: env.PUBLIC_URL ?? `http://localhost:${port}`, apiUrl: env.API_URL || undefined,
-    cookieDomain: env.COOKIE_DOMAIN || undefined, providers, devLogin: env.DEV_LOGIN === '1', voice: voiceFromEnv(),
+    cookieDomain: env.COOKIE_DOMAIN || undefined, providers, admins: (env.ADMIN_EMAILS ?? '').split(','), devLogin: env.DEV_LOGIN === '1', voice: voiceFromEnv(),
   }).on('listening', () => {
     const ips = Object.values(networkInterfaces()).flat().filter((i) => i?.family === 'IPv4' && !i.internal).map((i) => i!.address);
     log(`Kickabout API ${VERSION} na porcie ${port}; logowanie: ${[...Object.keys(providers), ...(env.DEV_LOGIN === '1' ? ['dev'] : [])].join(', ') || 'wyłączone'}.`);

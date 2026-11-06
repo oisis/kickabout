@@ -32,7 +32,14 @@ const TEXT = {
     delete: 'Delete my account', confirm_delete: 'Delete your Kickabout account for good?',
     err_state: 'Sign-in expired or was started in another tab. Please try again.', err_taken: 'That account is already linked to another Kickabout user.',
     err_provider: 'The sign-in provider did not answer. Please try again.', err_generic: 'Something went wrong. Please try again.',
-    since: 'since',
+    since: 'since', err_banned: 'This account is blocked.',
+    online: '{0} online', online_title: 'Players and fans connected right now', nav_admin: 'Admin',
+    adm_title: 'Administration', adm_denied: 'Only administrators can open this page.', adm_online: 'Online now', adm_playing: 'playing', adm_waiting: 'waiting', adm_watching: 'watching', adm_matches: 'matches',
+    adm_users: 'Accounts', adm_users_n: 'accounts', adm_banned_n: 'blocked', adm_clubs: 'clubs', adm_search: 'Search by name or e-mail', adm_add: 'Add a user', adm_add_lead: 'The account is taken over at the first sign-in (Google or GitHub) with this e-mail address.',
+    adm_name: 'Name', adm_email: 'E-mail', adm_add_btn: 'Add', adm_added: 'User added.', adm_exists: 'An account with this e-mail already exists.', adm_bad: 'Check the name and the e-mail address.',
+    adm_emails: 'E-mail addresses', adm_copy: 'Copy all', adm_copied: 'Copied.', adm_ban: 'Block', adm_unban: 'Unblock', adm_delete: 'Delete', adm_banned: 'blocked', adm_admin: 'admin', adm_invited: 'waiting for the first sign-in',
+    adm_confirm_ban: 'Block {0}? They are signed out everywhere and cannot sign in again.', adm_confirm_delete: 'Delete {0} for good? The account, the coins and the history are removed; the club goes back to the computer.',
+    adm_joined: 'joined', adm_seen: 'last sign-in', adm_none: 'No accounts found.',
   },
   pl: {
     nav_play: 'Graj', nav_live: 'Strefa kibica', nav_download: 'Pobierz',
@@ -66,7 +73,14 @@ const TEXT = {
     delete: 'Usuń moje konto', confirm_delete: 'Na pewno usunąć konto Kickabout?',
     err_state: 'Logowanie wygasło albo zaczęło się w innej karcie. Spróbuj ponownie.', err_taken: 'To konto jest już połączone z innym użytkownikiem Kickabout.',
     err_provider: 'Dostawca logowania nie odpowiedział. Spróbuj ponownie.', err_generic: 'Coś poszło nie tak. Spróbuj ponownie.',
-    since: 'od',
+    since: 'od', err_banned: 'To konto jest zablokowane.',
+    online: '{0} online', online_title: 'Gracze i kibice połączeni w tej chwili', nav_admin: 'Admin',
+    adm_title: 'Administracja', adm_denied: 'Tę stronę mogą otworzyć tylko administratorzy.', adm_online: 'Teraz online', adm_playing: 'gra', adm_waiting: 'czeka', adm_watching: 'ogląda', adm_matches: 'mecze',
+    adm_users: 'Konta', adm_users_n: 'konta', adm_banned_n: 'zablokowane', adm_clubs: 'kluby', adm_search: 'Szukaj po nazwie lub e-mailu', adm_add: 'Dodaj użytkownika', adm_add_lead: 'Konto przejmie osoba, która pierwszy raz zaloguje się (Google lub GitHub) tym adresem e-mail.',
+    adm_name: 'Nazwa', adm_email: 'E-mail', adm_add_btn: 'Dodaj', adm_added: 'Dodano użytkownika.', adm_exists: 'Konto z tym adresem e-mail już istnieje.', adm_bad: 'Sprawdź nazwę i adres e-mail.',
+    adm_emails: 'Adresy e-mail', adm_copy: 'Kopiuj wszystkie', adm_copied: 'Skopiowano.', adm_ban: 'Zablokuj', adm_unban: 'Odblokuj', adm_delete: 'Usuń', adm_banned: 'zablokowany', adm_admin: 'admin', adm_invited: 'czeka na pierwsze logowanie',
+    adm_confirm_ban: 'Zablokować {0}? Zostanie wylogowany wszędzie i nie zaloguje się ponownie.', adm_confirm_delete: 'Usunąć {0} na zawsze? Znikną konto, monety i historia, a klub wróci do komputera.',
+    adm_joined: 'od', adm_seen: 'ostatnie logowanie', adm_none: 'Brak kont.',
   },
 };
 
@@ -84,6 +98,7 @@ export const api = async (path, init = {}) => {
 function translate() {
   document.documentElement.lang = lang;
   for (const el of document.querySelectorAll('[data-i18n]')) el.innerHTML = t(el.dataset.i18n);
+  for (const el of document.querySelectorAll('[data-i18n-ph]')) el.placeholder = t(el.dataset.i18nPh);
   const sel = document.querySelector('.lang');
   if (sel) {
     sel.value = lang;
@@ -99,6 +114,21 @@ export function setHeader(user) {
   link.textContent = '';
   if (user.avatar) link.append(Object.assign(document.createElement('img'), { className: 'avatar', src: user.avatar, alt: '' }), ' ');
   link.append(user.name);
+  if (user.admin && !document.querySelector('#admin-link')) link.before(Object.assign(document.createElement('a'), { id: 'admin-link', href: '/admin.html', textContent: t('nav_admin') }));
+}
+
+/** "● 12 online" in the header: players in matches, players waiting for one and fans. */
+async function online() {
+  const nav = document.querySelector('header nav');
+  if (!nav) return;
+  let badge = nav.querySelector('.online');
+  if (!badge) { badge = Object.assign(document.createElement('span'), { className: 'online', title: t('online_title') }); badge.hidden = true; nav.prepend(badge); }
+  const { status, data } = await api('/online').catch(() => ({ status: 0 }));
+  if (status === 200) {
+    const [before, after] = t('online').split('{0}');
+    badge.replaceChildren(before, Object.assign(document.createElement('b'), { textContent: data.online.toLocaleString(lang) }), Object.assign(document.createElement('span'), { className: 'lbl', textContent: after }));
+    badge.hidden = false;
+  }
 }
 
 async function header() {
@@ -108,5 +138,7 @@ async function header() {
 
 translate();
 header();
+online();
+setInterval(() => { if (!document.hidden) online(); }, 20_000);
 // Version of the running API in the footer.
 api('/version').then(({ data }) => { const f = document.querySelector('footer .wrap'); if (f && data.version) f.append(` • v${data.version}`); }).catch(() => {});

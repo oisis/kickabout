@@ -80,7 +80,7 @@ jobs:
           printf 'storeFile=release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/keystore.properties
       - name: Build APK
         env:
-          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+          PUBLIC_URL: ${{ vars.PUBLIC_URL || 'https://kickabout.oisis.pl' }}
         run: |
           if [ -n "$PUBLIC_URL" ]; then
             export VITE_SITE="${PUBLIC_URL%/}/"

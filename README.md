@@ -120,15 +120,30 @@ Konfiguracja API (zmienne środowiskowe):
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → OAuth client ID (Web), redirect URI: `<PUBLIC_URL>/api/auth/google/callback` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | [GitHub → Settings → Developer settings → OAuth Apps](https://github.com/settings/developers), callback URL: `<PUBLIC_URL>/api/auth/github/callback` |
 | `API_URL`, `COOKIE_DOMAIN` | tryb subdomeny: API pod `https://api.example.pl`, ciasteczko wspólne dla `example.pl` |
-| `DEV_LOGIN=1` | logowanie samym imieniem, tylko do testów |
+| `ADMIN_EMAILS` | adresy e-mail administratorów, po przecinku (adres konta Google/GitHub), np. `ja@example.pl` |
+| `DEV_LOGIN=1` | logowanie samym imieniem, tylko do testów (imię w postaci adresu e-mail liczy się jako e-mail, np. do testu panelu admina) |
 | `DB_PATH` | plik SQLite (w obrazie `/data/kickabout.db`) |
 
 Dostawca bez danych jest ukryty na stronie. Sesje to losowe tokeny w ciasteczku `HttpOnly; SameSite=Lax` (w bazie tylko ich skrót SHA-256), ważne 30 dni.
 
+### Panel administratora
+
+Administrator (e-mail z `ADMIN_EMAILS`, w Helmie `api.adminEmails`) widzi w nagłówku strony odnośnik **Admin** (`/admin.html`). Panel pokazuje:
+- kto jest teraz online (grający, czekający, kibice) i liczbę meczów, kont, klubów i blokad;
+- listę kont z wyszukiwarką: nazwa, adresy e-mail, metody logowania, klub, monety, data założenia i ostatniego logowania;
+- wszystkie adresy e-mail z przyciskiem „Kopiuj wszystkie”.
+
+Akcje:
+- **Dodaj użytkownika** (nazwa + e-mail): konto przejmuje osoba, która pierwszy raz zaloguje się tym adresem.
+- **Zablokuj / Odblokuj**: blokada od razu wylogowuje ze strony i z aplikacji. Zablokowany nie zaloguje się też innym dostawcą z tym samym adresem e-mail.
+- **Usuń**: tak jak „Usuń moje konto”, czyli klub wraca do komputera.
+
+Własnego konta nie da się zablokować ani usunąć. Licznik „● N online” w nagłówku każdej strony pochodzi z publicznego `GET /api/online`.
+
 ## Gra online
 
 - **W przeglądarce** (`/play/`): adres serwera jest wpisany automatycznie (`/ws` tej samej strony).
-- **W aplikacji**: domyślny adres ustawia się przy budowaniu APK (`VITE_SERVER=wss://kickabout.example.com/ws`, a odnośnik „Strona www i konto” w menu: `VITE_SITE=https://kickabout.example.com/`). Można też wpisać `IP:8787` serwera API w sieci lokalnej (`scripts/start-server.sh`).
+- **W aplikacji**: domyślny adres to `kickabout.oisis.pl`. Inny ustawia się przy budowaniu APK (`VITE_SERVER=wss://kickabout.example.com/ws`, a odnośnik „Strona www i konto” w menu: `VITE_SITE=https://kickabout.example.com/`; w CI z repozytoryjnej zmiennej `PUBLIC_URL`). Można też wpisać `IP:8787` serwera API w sieci lokalnej (`scripts/start-server.sh`).
 
 Potem jedna z opcji:
 - **Szybka gra:** łączysz się z dowolnym czekającym graczem.

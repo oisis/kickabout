@@ -23,6 +23,8 @@ export interface AccountOptions {
   cookieDomain?: string;
   providers?: Record<string, Provider>;
   devLogin?: boolean; // POST /auth/dev signs in by name: local testing only
+  /** E-mail addresses of administrators (ADMIN_EMAILS): matched against the account's and its sign-ins' e-mails. */
+  admins?: string[];
 }
 
 export interface User { id: number; hash: string; via: 'cookie' | 'bearer' }
@@ -72,11 +74,13 @@ function openDb(path: string) {
     CREATE TABLE IF NOT EXISTS identities (provider TEXT NOT NULL, subject TEXT NOT NULL, user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE, email TEXT NOT NULL DEFAULT '', created INTEGER NOT NULL, PRIMARY KEY (provider, subject));
     CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE, created INTEGER NOT NULL, expires INTEGER NOT NULL, agent TEXT NOT NULL DEFAULT '');
     CREATE TABLE IF NOT EXISTS app_codes (code TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE, expires INTEGER NOT NULL);`);
+  try { db.exec('ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0'); } catch { /* already there */ }
   return db;
 }
 
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const cookies = (req: IncomingMessage) => Object.fromEntries((req.headers.cookie ?? '').split(';').map((c) => c.trim().split('=')).filter((p) => p.length === 2).map(([k, v]) => [k, decodeURIComponent(v)]));
+const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 /**
@@ -96,12 +100,25 @@ export function accounts(opts: AccountOptions = {}, routes: Route[] = []) {
 
   const q = {
     user: db.prepare('SELECT id, name, email, avatar, created FROM users WHERE id = ?'),
-    session: db.prepare('SELECT user_id FROM sessions WHERE hash = ? AND expires > ?'),
+    session: db.prepare('SELECT s.user_id FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.hash = ? AND s.expires > ? AND u.banned = 0'),
     addSession: db.prepare('INSERT INTO sessions (hash, user_id, created, expires, agent) VALUES (?, ?, ?, ?, ?)'),
     identity: db.prepare('SELECT user_id FROM identities WHERE provider = ? AND subject = ?'),
     addIdentity: db.prepare('INSERT INTO identities (provider, subject, user_id, email, created) VALUES (?, ?, ?, ?, ?)'),
     addUser: db.prepare('INSERT INTO users (name, email, avatar, created) VALUES (?, ?, ?, ?)'),
+    banned: db.prepare('SELECT banned FROM users WHERE id = ?'),
+    // a user an administrator added by e-mail, waiting for their first sign-in
+    invited: db.prepare('SELECT id FROM users u WHERE lower(email) = lower(?) AND NOT EXISTS (SELECT 1 FROM identities i WHERE i.user_id = u.id)'),
+    // a banned person may not come back with another provider under the same e-mail
+    bannedEmail: db.prepare('SELECT 1 FROM users u WHERE u.banned = 1 AND (lower(u.email) = lower(?) OR EXISTS (SELECT 1 FROM identities i WHERE i.user_id = u.id AND lower(i.email) = lower(?)))'),
   };
+  const admins = new Set((opts.admins ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean));
+  const isBanned = (id: number) => (q.banned.get(id) as { banned: number } | undefined)?.banned === 1;
+  /** An administrator: the account's e-mail or one of its sign-ins' e-mails is in ADMIN_EMAILS. */
+  function isAdmin(id: number): boolean {
+    if (!admins.size) return false;
+    const rows = db.prepare('SELECT email FROM users WHERE id = ? UNION SELECT email FROM identities WHERE user_id = ?').all(id, id) as { email: string }[];
+    return rows.some((r) => admins.has(r.email.toLowerCase()));
+  }
 
   /** Returns the raw session token. */
   function newToken(userId: number, agent: string) {
@@ -120,14 +137,22 @@ export function accounts(opts: AccountOptions = {}, routes: Route[] = []) {
     return row ? { id: row.user_id, hash: sha(raw), via: bearer ? 'bearer' : 'cookie' } : null;
   }
   /** Finds or creates the user behind an external identity; links it to `linkTo` when given. */
-  function signIn(provider: string, p: { subject: string; name: string; email: string; avatar: string }, linkTo: number | null): number | 'taken' {
+  function signIn(provider: string, p: { subject: string; name: string; email: string; avatar: string }, linkTo: number | null): number | 'taken' | 'banned' {
     const known = q.identity.get(provider, p.subject) as { user_id: number } | undefined;
+    if (known && isBanned(known.user_id)) return 'banned';
     if (linkTo !== null) {
       if (known && known.user_id !== linkTo) return 'taken';
       if (!known) q.addIdentity.run(provider, p.subject, linkTo, p.email, Date.now());
       return linkTo;
     }
     if (known) return known.user_id;
+    if (p.email && q.bannedEmail.get(p.email, p.email)) return 'banned';
+    const invited = p.email ? q.invited.get(p.email) as { id: number } | undefined : undefined;
+    if (invited) {
+      q.addIdentity.run(provider, p.subject, invited.id, p.email, Date.now());
+      if (p.avatar) db.prepare("UPDATE users SET avatar = ? WHERE id = ? AND avatar = ''").run(p.avatar, invited.id);
+      return invited.id;
+    }
     const id = Number(q.addUser.run(p.name.slice(0, 40) || 'Player', p.email, p.avatar, Date.now()).lastInsertRowid);
     q.addIdentity.run(provider, p.subject, id, p.email, Date.now());
     return id;
@@ -139,6 +164,7 @@ export function accounts(opts: AccountOptions = {}, routes: Route[] = []) {
       sessions: (db.prepare('SELECT hash, created, agent FROM sessions WHERE user_id = ? AND expires > ? ORDER BY created DESC').all(userId, Date.now()) as { hash: string; created: number; agent: string }[])
         .map((s) => ({ created: s.created, agent: s.agent, current: s.hash === hash })),
       providers: Object.keys(providers),
+      admin: isAdmin(userId),
     };
   }
 
@@ -196,7 +222,7 @@ export function accounts(opts: AccountOptions = {}, routes: Route[] = []) {
         }));
         if (!tok.access_token) throw new Error('no access token');
         const id = signIn(m[1], await p.profile(tok.access_token, p.api), link === '1' && user ? user.id : null);
-        if (id === 'taken') redirect(res, account('?error=taken'), [clear]);
+        if (id === 'taken' || id === 'banned') redirect(res, account(`?error=${id}`), [clear]);
         else if (link === '1' && user) redirect(res, account('?linked=' + m[1]), [clear]);
         else redirect(res, account(), [clear, newSession(id, String(req.headers['user-agent'] ?? ''))]);
       }
@@ -204,7 +230,8 @@ export function accounts(opts: AccountOptions = {}, routes: Route[] = []) {
       else if (path === '/auth/dev' && method === 'POST' && opts.devLogin) {
         const name = String((await body()).name ?? '').trim().slice(0, 40);
         if (!name) { send(400, { error: 'name' }); return true; }
-        const id = signIn('dev', { subject: name.toLowerCase(), name, email: '', avatar: '' }, null) as number;
+        const id = signIn('dev', { subject: name.toLowerCase(), name, email: EMAIL_LIKE.test(name) ? name : '', avatar: '' }, null); // dev: a name like an e-mail is one (admin tests)
+        if (typeof id !== 'number') { send(403, { error: id }); return true; }
         send(200, { ok: true }, { 'set-cookie': newSession(id, String(req.headers['user-agent'] ?? '')) });
       }
 
@@ -212,7 +239,7 @@ export function accounts(opts: AccountOptions = {}, routes: Route[] = []) {
       else if (path === '/app-token' && method === 'POST') {
         const code = String((await body()).code ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
         const row = db.prepare('SELECT user_id FROM app_codes WHERE code = ? AND expires > ?').get(code, Date.now()) as { user_id: number } | undefined;
-        if (!row) { send(404, { error: 'code' }); return true; }
+        if (!row || isBanned(row.user_id)) { send(404, { error: 'code' }); return true; }
         db.prepare('DELETE FROM app_codes WHERE code = ?').run(code);
         send(200, { token: newToken(row.user_id, 'Kickabout app') });
       }
@@ -264,5 +291,5 @@ export function accounts(opts: AccountOptions = {}, routes: Route[] = []) {
     return true;
   }
 
-  return { db, handle, userOf };
+  return { db, handle, userOf, isAdmin };
 }
