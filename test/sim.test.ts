@@ -78,8 +78,42 @@ test('pause and substitution commands change state deterministically', () => {
   const benchPlayer = s.bench[0][0];
   step(s, [cmd(CMD_SUB, 4, benchPlayer), 0]);
   assert.equal(s.teams[0][4].n, benchPlayer);
-  assert.equal(s.subsLeft[0], 2);
+  assert.equal(s.subsLeft[0], 4);
   assert.ok(!s.bench[0].includes(benchPlayer));
+});
+
+test('substitutions follow IFAB Law 3: 5 players, 3 stoppages, half-time free, +1 of each in extra time', () => {
+  const s = newMatch(7, setup({ minutes: 5, extraTime: true }));
+  // Like the game: pause, substitute, resume (the clock stands still in a pause).
+  const sub = (...outs: number[]) => { step(s, [cmd(CMD_PAUSE), 0]); for (const o of outs) step(s, [cmd(CMD_SUB, o, s.bench[0][0]), 0]); step(s, [cmd(CMD_PAUSE), 0]); };
+  const play = (frames: number) => { for (let i = 0; i < frames && s.phase !== 'end'; i++) step(s, [cpuInput(s, 0), cpuInput(s, 1)]); };
+  sub(2); // before kick-off: free
+  assert.deepEqual([s.subsLeft[0], s.subWindows[0]], [4, 3]);
+  play(600);
+  sub(3, 4); // one stoppage, two players
+  assert.deepEqual([s.subsLeft[0], s.subWindows[0]], [2, 2]);
+  play(600); sub(5);
+  play(600); sub(6);
+  assert.deepEqual([s.subsLeft[0], s.subWindows[0]], [0, 0]);
+  const before = s.teams[0][7].n;
+  sub(7); // nothing left
+  assert.equal(s.teams[0][7].n, before);
+
+  // Windows run out before players do: a fourth stoppage is refused.
+  const t = newMatch(8, setup({ minutes: 5 }));
+  const subT = (out: number) => { step(t, [cmd(CMD_PAUSE), 0]); step(t, [cmd(CMD_SUB, out, t.bench[0][0]), 0]); step(t, [cmd(CMD_PAUSE), 0]); };
+  for (const out of [2, 3, 4]) { for (let i = 0; i < 600; i++) step(t, [cpuInput(t, 0), cpuInput(t, 1)]); subT(out); }
+  assert.deepEqual([t.subsLeft[0], t.subWindows[0]], [2, 0]);
+  for (let i = 0; i < 600; i++) step(t, [cpuInput(t, 0), cpuInput(t, 1)]);
+  const n5 = t.teams[0][5].n;
+  subT(5);
+  assert.equal(t.teams[0][5].n, n5, 'no fourth stoppage');
+  while (t.phase !== 'half' && t.phase !== 'end') step(t, [cpuInput(t, 0), cpuInput(t, 1)]);
+  if (t.phase === 'half') { subT(5); assert.notEqual(t.teams[0][5].n, n5, 'half-time does not count'); }
+
+  // Extra time: one more substitution and one more stoppage.
+  while (s.period < 2 && s.phase !== 'end') play(60);
+  if (s.period === 2) assert.deepEqual([s.subsLeft[0], s.subWindows[0]], [1, 1]);
 });
 
 test('a slide that takes the player instead of the ball in the box gives a penalty', () => {

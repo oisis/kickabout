@@ -138,7 +138,7 @@ function player(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, view: 
   const kit = info.kits[t], shirt = i === 0 ? info.keepers[t] : kit.shirt;
   ellipse(ctx, p.x + 0.15 * M, p.y, 0.5 * M, 0.22 * M, 'rgba(0,0,0,0.3)');
   if (p.slide || p.down) {
-    lying(ctx, p, shirt, kit.shorts, !!p.slide || !p.fell);
+    lying(ctx, p, shirt, kit.shorts, !!p.slide || !p.fell, t);
     return;
   }
   // Running: legs swing gently along the facing direction, the body bobs a little.
@@ -156,9 +156,7 @@ function player(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, view: 
   shirtBody(ctx, p.x, p.y - 1.74 * M - bob, shirt, swing);
   shirtNumber(ctx, p.n + 1, p.x, p.y - 1.33 * M - bob, shirt);
   if (p.yel) { ctx.fillStyle = '#facc15'; ctx.fillRect(p.x + 0.2 * M, p.y - 1.6 * M - bob, 0.14 * M, 0.2 * M); }
-  const hx = p.x + fx * 0.08 * M, hy = p.y - 2.0 * M + fy * 0.05 * M - bob;
-  ellipse(ctx, hx, hy, 0.25 * M, 0.26 * M, '#e8b98a');
-  ellipse(ctx, hx - (p.fx / 1000) * 0.08 * M, hy - (p.fy / 1000) * 0.08 * M - 0.08 * M, 0.21 * M, 0.17 * M, '#3b2416');
+  head(ctx, p.x + fx * 0.08 * M, p.y - 2.0 * M + fy * 0.05 * M - bob, fx, fy, p.n * 7 + t * 5, 0.11 * M);
   const human = view.humans[t];
   if (human && i === s.controlled[t]) {
     ctx.beginPath();
@@ -188,6 +186,23 @@ function shirtBody(ctx: CanvasRenderingContext2D, x: number, y: number, shirt: s
   ctx.lineJoin = 'miter';
 }
 
+const HAIR = ['#1c1410', '#3b2416', '#5a3820', '#8a5a2b', '#c9a061', '#2b2b2b', '#7a2e12', '#4a2c18', '#e0c48a'];
+
+/**
+ * Head with hair: the hair is the head's own shape shifted back from where the player looks
+ * (and up), clipped to the head, so the face shows on the side he is facing. Colour per player.
+ */
+function head(ctx: CanvasRenderingContext2D, x: number, y: number, fx: number, fy: number, seed: number, lift: number) {
+  const r = 0.25 * M;
+  ellipse(ctx, x, y, r, r * 1.04, '#e8b98a');
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(x, y, r, r * 1.04, 0, 0, Math.PI * 2); ctx.clip();
+  ellipse(ctx, x - fx * 0.13 * M, y - fy * 0.1 * M - lift, r * (seed % 3 === 0 ? 1.12 : 1.02), r * 0.95, HAIR[seed % HAIR.length]);
+  ctx.restore();
+  ctx.lineWidth = 0.03 * M; ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath(); ctx.ellipse(x, y, r, r * 1.04, 0, 0, Math.PI * 2); ctx.stroke();
+}
+
 /** Squad number on the shirt, dark or light depending on the shirt colour. */
 function shirtNumber(ctx: CanvasRenderingContext2D, n: number, x: number, y: number, shirt: string) {
   const c = parseInt(shirt.slice(1), 16), light = ((c >> 16) * 299 + ((c >> 8) & 255) * 587 + (c & 255) * 114) / 1000 > 150;
@@ -202,7 +217,7 @@ function shirtNumber(ctx: CanvasRenderingContext2D, n: number, x: number, y: num
  * A player on the ground, drawn in the facing direction: a slide tackle goes feet
  * first (legs towards the ball, head behind) until they are back up; a fouled player lies head first.
  */
-function lying(ctx: CanvasRenderingContext2D, p: Player, shirt: string, shorts: string, feetFirst: boolean) {
+function lying(ctx: CanvasRenderingContext2D, p: Player, shirt: string, shorts: string, feetFirst: boolean, team: number) {
   ctx.save();
   ctx.translate(p.x, p.y - 0.3 * M);
   ctx.rotate(Math.atan2(p.fy, p.fx) + (feetFirst ? 0 : Math.PI));
@@ -213,8 +228,7 @@ function lying(ctx: CanvasRenderingContext2D, p: Player, shirt: string, shorts: 
   ctx.fillStyle = shorts;
   ctx.fillRect(-0.2 * M, -0.26 * M, 0.34 * M, 0.52 * M);
   ellipse(ctx, -0.5 * M, 0, 0.42 * M, 0.34 * M, shirt);
-  ellipse(ctx, -1.02 * M, 0, 0.25 * M, 0.25 * M, '#e8b98a');
-  ellipse(ctx, -1.1 * M, 0, 0.17 * M, 0.21 * M, '#3b2416');
+  head(ctx, -1.02 * M, 0, 1, 0, p.n * 7 + team * 5, 0); // crown away from the body
   ctx.restore();
 }
 
@@ -277,6 +291,19 @@ function hud(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, cw: numbe
     ctx.fillRect(px + pr * 0.13, py - pr * 0.4, pr * 0.22, pr * 0.8);
   }
   if (view.voice) mic(ctx, cw + MIC_BTN.x * dpr, MIC_BTN.y * dpr, MIC_BTN.r * dpr, view.voice);
+
+  // Who has the ball (bottom left): a swatch of the team's shirt, the shirt number and the name.
+  if (s.ownerTeam >= 0 && !view.overlay) {
+    const p = s.teams[s.ownerTeam][s.ownerIdx], label = `${p.n + 1}  ${info.players[s.ownerTeam]?.[p.n] ?? ''}`;
+    const size = u * 0.6, maxW = cw * 0.5;
+    ctx.font = `800 ${size}px system-ui, sans-serif`;
+    const w = Math.min(ctx.measureText(label).width, maxW), y = ch - u * 1.3;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(u * 0.4, y - u * 0.6, w + u * 1.6, u * 1.2);
+    ctx.fillStyle = s.ownerIdx === 0 ? info.keepers[s.ownerTeam] : info.kits[s.ownerTeam].shirt;
+    ctx.fillRect(u * 0.65, y - u * 0.3, u * 0.6, u * 0.6);
+    ctx.textAlign = 'left';
+    text(ctx, label, u * 1.5, y, size, '#fff', maxW);
+  }
 
   ctx.textAlign = 'center';
   if (view.replay) {

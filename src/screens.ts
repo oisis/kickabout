@@ -1,5 +1,5 @@
 // Menu screens. Each function renders one screen into the #ui overlay.
-import { FORMATIONS, PITCHES, CMD_SUB, CMD_TACTIC, cmd, lineOf, type State } from './sim.ts';
+import { FORMATIONS, PITCHES, CMD_SUB, CMD_TACTIC, cmd, lineOf, minute, subAllowed, type State } from './sim.ts';
 import { TEAMS, POS, LEAGUE_COUNTRIES, leagueLabel, type TeamDef, team, rating, pickLineup, onlineMatch } from './data.ts';
 import { type MatchRun, type Side, makeSpec, choosePitch } from './match.ts';
 import { type Options, options, saveOptions, minuteOptions, MATCH_MINUTES, highlights, deleteHighlight, addHighlights, download, upload, customTeams, customTactics, type Highlight } from './store.ts';
@@ -144,12 +144,14 @@ function liveSquad(app: App, run: MatchRun, t: number) {
     const rows = s.teams[t].map((p, i) => [tr(POS[lineOf(shape[i], i)]), names[p.n] + (p.off ? ` (${tr('cz. k.')})` : p.yel ? ' 🟨' : ''), p.pos === 0 ? p.gk : rating(p)]);
     const bench = s.bench[t].map((n) => [tr('ław'), names[n], s.squads[t][n].pos === 0 ? s.squads[t][n].gk : rating(s.squads[t][n])]);
     show(
-      title(tr('Zmiany i taktyka'), tr('Pozostałe zmiany: {0} — dotknij zawodnika na boisku, potem rezerwowego', s.subsLeft[t])),
+      title(tr('Zmiany i taktyka'), tr('Zmiany: {0} z 5, przerwy na zmiany: {1} z 3 — dotknij zawodnika na boisku, potem rezerwowego', s.subsLeft[t], s.subWindows[t])),
+      h('p', { className: 'sub' }, tr('Przepisy: do 5 zmian w najwyżej 3 przerwach w grze; zmiany w przerwie meczu się nie liczą, dogrywka daje jedną zmianę i jedną przerwę więcej. Zmieniony zawodnik nie wraca na boisko.')),
       select(tr('Taktyka'), s.tactic[t], tacticNames().slice(0, s.tactics[t].length).map((n, i): [number, string] => [i, n]), (v) => { run.command(t, cmd(CMD_TACTIC, v)); setTimeout(draw, 50); }),
       table(['', tr('Zawodnik'), tr('Oc')], [...rows, ...bench], (i) => {
         if (i < 11) { picked = i; return draw(); }
         if (picked < 0) return toast(tr('Najpierw wybierz zawodnika na boisku'));
         if (!s.subsLeft[t]) return toast(tr('Wykorzystano wszystkie zmiany'));
+        if (!subAllowed(s, t)) return toast(tr('Wykorzystano wszystkie przerwy na zmiany'));
         run.command(t, cmd(CMD_SUB, picked, s.bench[t][i - 11]));
         picked = -1;
         setTimeout(draw, 50);
@@ -168,6 +170,8 @@ export function pauseMenu(app: App, run: MatchRun) {
     h('nav', {},
       btn(tr('Wznów'), () => run.togglePause(), 'primary big'),
       ...humanTeams.map((t) => btn(tr('Zmiany i taktyka{0}', humanTeams.length > 1 ? ` (${run.info.shorts[t]})` : ''), () => liveSquad(app, run, t))),
+      btn(tr('Przebieg meczu'), () => matchReport(app, run)),
+      btn(tr('Sterowanie'), () => controlsHelp(() => pauseMenu(app, run))),
       app.voice && btn(app.voice.muted ? tr('Włącz mój mikrofon') : tr('Wycisz mój mikrofon'), () => { app.voice!.toggleMute(); pauseMenu(app, run); }),
       app.voice && btn(app.voice.deaf ? tr('Słuchaj przeciwnika') : tr('Wycisz przeciwnika'), () => { app.voice!.toggleDeaf(); pauseMenu(app, run); }),
       local && btn(tr('Powtórka'), () => {
@@ -185,19 +189,63 @@ export function fullTime(app: App, run: MatchRun, next: () => void) {
     title(tr('Koniec meczu')),
     h('div', { className: 'score' }, `${info.names[0]} ${s.score[0]} : ${s.score[1]} ${info.names[1]}`),
     s.so && h('p', { className: 'sub' }, `rzuty karne ${s.so.goals[0]}:${s.so.goals[1]}`),
-    scorers(s, info.players),
+    timeline(s, info.players),
     table(['', info.shorts[0], info.shorts[1]], statRows(s).map(([l, a, b]) => [l, a, b])),
     run.highlights.length > 0 && btn(tr('Obejrzyj gole ({0})', run.highlights.length), () => playAll(app, run.highlights, () => fullTime(app, run, next))),
     btn(tr('Dalej'), next, 'primary'),
   );
 }
 
-function scorers(s: State, players: string[][]) {
-  if (!s.stats.goals.length) return null;
-  return h('ul', { className: 'scorers' }, ...s.stats.goals.map((g) => {
-    const owner = g.og ? 1 - g.t : g.t;
-    return h('li', { className: g.t ? 'away' : 'home' }, `${g.min}' ${players[owner][g.n]}${g.og ? ' (sam.)' : ''}${g.pen ? ' (k.)' : ''}`);
-  }));
+/** Goals and bookings in minute order, home team on the left, away on the right. */
+function timeline(s: State, players: string[][]) {
+  const events = [
+    ...s.stats.goals.map((g) => ({ min: g.min, side: g.t, text: `⚽ ${players[g.og ? 1 - g.t : g.t][g.n]}${g.og ? ` (${tr('sam.')})` : ''}${g.pen ? ` (${tr('karny')})` : ''}` })),
+    ...(s.stats.cards ?? []).map((c) => ({ min: c.min, side: c.t, text: `${c.red ? (c.second ? '🟨🟥' : '🟥') : '🟨'} ${players[c.t][c.n]}` })),
+  ].sort((a, b) => a.min - b.min);
+  if (!events.length) return null;
+  return h('ul', { className: 'scorers' }, ...events.map((e) => h('li', { className: e.side ? 'away' : 'home' }, `${e.min}' ${e.text}`)));
+}
+
+/** From the pause menu: goals, cards and the match statistics so far. */
+function matchReport(app: App, run: MatchRun) {
+  const s = run.s, info = run.info;
+  show(
+    title(tr('Przebieg meczu'), `${info.names[0]} ${s.score[0]}:${s.score[1]} ${info.names[1]} — ${minute(s)}'`),
+    timeline(s, info.players) ?? h('p', { className: 'sub' }, tr('Na razie bez goli i kartek.')),
+    table(['', info.shorts[0], info.shorts[1]], statRows(s).map(([l, a, b]) => [l, a, b])),
+    btn(tr('← Wstecz'), () => pauseMenu(app, run), 'primary'),
+  );
+}
+
+/** How to play: touch, keyboard and gamepad. */
+export function controlsHelp(back: () => void) {
+  const rows = (list: [string, string][]) => Object.assign(table([tr('Akcja'), tr('Jak')], list), { className: 'help' });
+  show(
+    title(tr('Sterowanie'), tr('Sterujesz zawodnikiem ze strzałką ▼ — przełącza się sam na najbliższego piłki.')),
+    h('h3', {}, tr('Dotyk')),
+    rows([
+      [tr('Ruch'), tr('Połóż palec w lewej części ekranu i przesuwaj — to drążek')],
+      [tr('Podanie'), tr('Krótko dotknij {0} — do kolegi w kierunku biegu', tr('PODANIE'))],
+      [tr('Strzał'), tr('Przytrzymaj {0} — im dłużej, tym mocniej i wyżej', tr('STRZAŁ'))],
+      [tr('Wślizg'), tr('{0} lub {1}, gdy nie masz piłki', tr('PODANIE'), tr('STRZAŁ'))],
+      [tr('Podkręcenie'), tr('Zaraz po kopnięciu: drążek w bok podkręca piłkę, do tyłu ją podnosi')],
+      [tr('Pauza'), tr('Przycisk ⏸ w prawym górnym rogu')],
+    ]),
+    h('h3', {}, tr('Klawiatura')),
+    rows([
+      [tr('Gracz 1'), tr('Strzałki; Spacja lub Enter — podanie; M, prawy Shift lub prawy Ctrl — strzał')],
+      [tr('Gracz 2'), tr('W A S D; F — podanie; G, lewy Shift lub lewy Ctrl — strzał')],
+      [tr('Pauza'), tr('Esc lub P')],
+    ]),
+    h('h3', {}, tr('Pad')),
+    rows([
+      [tr('Ruch'), tr('Lewa gałka lub krzyżak')],
+      [tr('Podanie'), 'A'],
+      [tr('Strzał'), tr('B lub X (przytrzymaj)')],
+      [tr('Pauza'), 'Start'],
+    ]),
+    btn(tr('← Wstecz'), back, 'primary'),
+  );
 }
 
 function playAll(app: App, list: Highlight[], done: () => void, i = 0) {

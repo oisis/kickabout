@@ -72,6 +72,8 @@ export interface Player extends Skills {
 }
 export interface Ball { x: number; y: number; z: number; vx: number; vy: number; vz: number }
 export interface Goal { t: number; n: number; min: number; og: number; pen: number }
+/** A booking: team, squad number, minute; red = sent off (second = after a second yellow). */
+export interface Card { t: number; n: number; min: number; red: number; second: number }
 export type Phase = 'kickoff' | 'play' | 'out' | 'goal' | 'half' | 'shootout' | 'end';
 export type RestartType = 'throw' | 'corner' | 'goalkick' | 'free' | 'penalty';
 
@@ -103,10 +105,14 @@ export interface State {
   paused: boolean;
   squads: Skills[][];
   bench: number[][];
+  /** Substitutions (IFAB Law 3): 5 players in at most 3 stoppages; half-time is free; extra time adds one of each. */
   subsLeft: number[];
+  subWindows: number[];
+  /** Match clock of each team's last substitution stoppage: more subs in the same stoppage share it. */
+  subTick: number[];
   tactics: number[][][][];
   tactic: number[];
-  stats: { shots: number[]; onTarget: number[]; corners: number[]; fouls: number[]; yellow: number[]; red: number[]; poss: number[]; goals: Goal[] };
+  stats: { shots: number[]; onTarget: number[]; corners: number[]; fouls: number[]; yellow: number[]; red: number[]; poss: number[]; goals: Goal[]; cards: Card[] };
   /** Aftertouch window after a kick: the kicking team's stick bends or lifts the ball. */
   after: { team: number; ticks: number } | null;
   event: EventCode | '';
@@ -164,10 +170,10 @@ export function newMatch(seed: number, setup: MatchSetup): State {
     prevInput: [0, 0], hold: [0, 0], keeperHold: 0, paused: false,
     squads: setup.teams.map((t) => t.squad.map((p) => ({ ...p }))),
     bench: setup.teams.map((t) => t.squad.map((_, i) => i).filter((i) => !t.lineup.includes(i))),
-    subsLeft: [3, 3],
+    subsLeft: [5, 5], subWindows: [3, 3], subTick: [-1, -1],
     tactics: setup.teams.map((t) => t.tactics),
     tactic: setup.teams.map((t) => t.tactic),
-    stats: { shots: [0, 0], onTarget: [0, 0], corners: [0, 0], fouls: [0, 0], yellow: [0, 0], red: [0, 0], poss: [0, 0], goals: [] },
+    stats: { shots: [0, 0], onTarget: [0, 0], corners: [0, 0], fouls: [0, 0], yellow: [0, 0], red: [0, 0], poss: [0, 0], goals: [], cards: [] },
     after: null, event: '', eventFrame: 0,
   };
   s.teams = setup.teams.map((t, ti) => t.lineup.map((n) => ({
@@ -194,13 +200,25 @@ export function step(s: State, inputs: readonly number[]): void {
   s.prevInput = [inputs[0] & 31, inputs[1] & 31];
 }
 
+/** A substitution now opens a new stoppage (half-time and the start of a half are free; more subs in one stoppage share it). */
+function subUsesWindow(s: State, t: number): boolean {
+  const r = s.regTicks, free = s.phase === 'half' || (s.phase === 'kickoff' && [0, r >> 1, r, r + div(r, 6)].includes(s.tick));
+  return !free && s.subTick[t] !== s.tick;
+}
+
+/** Whether team t may bring a player on right now (IFAB Law 3). */
+export function subAllowed(s: State, t: number): boolean {
+  return s.subsLeft[t] > 0 && (s.subWindows[t] > 0 || !subUsesWindow(s, t));
+}
+
 function commands(s: State, inputs: readonly number[]) {
   for (let t = 0; t < 2; t++) {
     const w = inputs[t] | 0, c = (w >> 5) & 7, a = (w >> 8) & 255, b = (w >> 16) & 255;
     if (c === CMD_PAUSE) { s.paused = !s.paused; continue; }
     if (s.phase === 'end') continue;
     if (c === CMD_TACTIC && a < s.tactics[t].length) s.tactic[t] = a;
-    if (c === CMD_SUB && a < 11 && s.subsLeft[t] > 0 && s.bench[t].includes(b) && !s.teams[t][a].off) {
+    if (c === CMD_SUB && a < 11 && s.bench[t].includes(b) && !s.teams[t][a].off && subAllowed(s, t)) {
+      if (subUsesWindow(s, t)) { s.subWindows[t]--; s.subTick[t] = s.tick; }
       const p = s.teams[t][a];
       Object.assign(p, s.squads[t][b], { n: b, yel: 0, down: 0, slide: 0 });
       s.bench[t] = s.bench[t].filter((x) => x !== b);
@@ -242,6 +260,7 @@ function steer(p: Player, tx: number, ty: number, max: number) {
 
 function startPeriod(s: State, period: number) {
   s.period = period;
+  if (period === 2) for (const t of [0, 1]) { s.subsLeft[t]++; s.subWindows[t]++; } // extra time: one more of each
   s.sides = period % 2 === 0 ? [-1, 1] : [1, -1];
   kickoff(s, period % 2 === 0 ? s.firstKickoff : 1 - s.firstKickoff);
 }
@@ -699,13 +718,17 @@ function foul(s: State, t: number, slider: Player, victim: Player) {
   s.stats.fouls[t]++;
   victim.down = 45; victim.fell = 1;
   const r = rnd(s, 100);
+  const book = (red: number, second: number) => (s.stats.cards ??= []).push( // ??=: highlights saved before cards were recorded
+    { t, n: slider.n, min: Math.max(1, minute(s)), red, second });
   if (r < 6 || (r < 28 && slider.yel > 0)) {
     if (r >= 6) s.stats.yellow[t]++;
     s.stats.red[t]++;
+    book(1, r >= 6 ? 1 : 0);
     slider.off = 1; slider.x = -4 * M; slider.vx = slider.vy = slider.ax = slider.ay = 0; slider.slide = 0;
     say(s, 'red');
   } else if (r < 28) {
     slider.yel++; s.stats.yellow[t]++;
+    book(0, 0);
     say(s, 'yellow');
   } else say(s, 'foul');
   const gy = ownGoalY(s, t);
