@@ -4,6 +4,7 @@ import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import { WebSocket } from 'ws';
 import { startServer } from '../server/server.ts';
+import { SIM_VERSION } from '../src/sim.ts';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const value = (text: string, series: string) => Number(text.split('\n').find((l) => l.startsWith(series + ' '))?.split(' ')[1] ?? NaN);
@@ -25,8 +26,8 @@ test('Prometheus /metrics: accounts, online, matches; token; not under /api', as
   const a = new WebSocket(`${base.replace('http', 'ws')}/ws`), b = new WebSocket(`${base.replace('http', 'ws')}/ws`);
   await Promise.all([once(a, 'open'), once(b, 'open')]);
   t.after(() => { a.terminate(); b.terminate(); });
-  a.send(JSON.stringify({ t: 'join', config: {} })); await sleep(50);
-  b.send(JSON.stringify({ t: 'join', config: {} })); await sleep(100);
+  a.send(JSON.stringify({ t: 'join', sim: SIM_VERSION, config: {} })); await sleep(50);
+  b.send(JSON.stringify({ t: 'join', sim: SIM_VERSION, config: {} })); await sleep(100);
   let m = await scrape();
   assert.match(m, /^# TYPE kickabout_users gauge$/m);
   assert.equal(value(m, 'kickabout_users'), 2);

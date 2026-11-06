@@ -510,6 +510,7 @@ export const DICT: Record<string, Record<string, string>> = {
     'Esc lub P': 'Esc or P',
     'Lewa gałka lub krzyżak': 'Left stick or D-pad',
     'B lub X (przytrzymaj)': 'B or X (hold)',
+    'Zaktualizuj grę — ta wersja nie pasuje do serwera': 'Update the game — this version does not match the server',
   },
   fr: {
     'Pozwól oglądać w strefie kibica': 'Autoriser le visionnage dans l\'espace supporters',
@@ -1021,6 +1022,7 @@ export const DICT: Record<string, Record<string, string>> = {
     'Esc lub P': 'Échap ou P',
     'Lewa gałka lub krzyżak': 'Joystick gauche ou croix',
     'B lub X (przytrzymaj)': 'B ou X (maintenir)',
+    'Zaktualizuj grę — ta wersja nie pasuje do serwera': 'Mettez le jeu à jour — cette version ne correspond pas au serveur',
   },
   de: {
     'Pozwól oglądać w strefie kibica': 'Zuschauen in der Fanzone erlauben',
@@ -1532,6 +1534,7 @@ export const DICT: Record<string, Record<string, string>> = {
     'Esc lub P': 'Esc oder P',
     'Lewa gałka lub krzyżak': 'Linker Stick oder Steuerkreuz',
     'B lub X (przytrzymaj)': 'B oder X (halten)',
+    'Zaktualizuj grę — ta wersja nie pasuje do serwera': 'Aktualisiere das Spiel — diese Version passt nicht zum Server',
   },
   it: {
     'Pozwól oglądać w strefie kibica': 'Consenti la visione nella zona tifosi',
@@ -2043,6 +2046,7 @@ export const DICT: Record<string, Record<string, string>> = {
     'Esc lub P': 'Esc o P',
     'Lewa gałka lub krzyżak': 'Levetta sinistra o croce direzionale',
     'B lub X (przytrzymaj)': 'B o X (tieni premuto)',
+    'Zaktualizuj grę — ta wersja nie pasuje do serwera': 'Aggiorna il gioco — questa versione non corrisponde al server',
   },
   es: {
     'Pozwól oglądać w strefie kibica': 'Permitir verlo en la zona de aficionados',
@@ -2554,6 +2558,7 @@ export const DICT: Record<string, Record<string, string>> = {
     'Esc lub P': 'Esc o P',
     'Lewa gałka lub krzyżak': 'Joystick izquierdo o cruceta',
     'B lub X (przytrzymaj)': 'B o X (mantén)',
+    'Zaktualizuj grę — ta wersja nie pasuje do serwera': 'Actualiza el juego: esta versión no coincide con el servidor',
   },
   nl: {
     'Pozwól oglądać w strefie kibica': 'Kijken in de fanzone toestaan',
@@ -3065,5 +3070,6 @@ export const DICT: Record<string, Record<string, string>> = {
     'Esc lub P': 'Esc of P',
     'Lewa gałka lub krzyżak': 'Linker stick of D-pad',
     'B lub X (przytrzymaj)': 'B of X (vasthouden)',
+    'Zaktualizuj grę — ta wersja nie pasuje do serwera': 'Werk de game bij — deze versie past niet bij de server',
   },
 };

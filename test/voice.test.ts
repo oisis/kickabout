@@ -4,11 +4,12 @@ import { once } from 'node:events';
 import { createHmac } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { startServer } from '../server/server.ts';
+import { SIM_VERSION } from '../src/sim.ts';
 import { iceServers } from '../server/voice.ts';
 
 function client(url: string, join: object) {
   const ws = new WebSocket(url);
-  ws.onopen = () => ws.send(JSON.stringify({ t: 'join', ...join }));
+  ws.onopen = () => ws.send(JSON.stringify({ t: 'join', sim: SIM_VERSION, ...join }));
   const inbox: any[] = [], waiters: ((m: any) => void)[] = [];
   ws.onmessage = (e) => { const m = JSON.parse(String(e.data)); const w = waiters.shift(); if (w) w(m); else inbox.push(m); };
   const next = (ms = 1000) => new Promise<any>((r) => { const m = inbox.shift(); if (m) return r(m); const t = setTimeout(() => r(null), ms); waiters.push((x) => { clearTimeout(t); r(x); }); });

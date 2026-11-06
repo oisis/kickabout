@@ -1,10 +1,10 @@
 // Lockstep client: send our input for tick k+delay after simulating tick k,
 // and simulate a tick only once the server has delivered both inputs for it.
-import type { State } from './sim.ts';
+import { SIM_VERSION, type State } from './sim.ts';
 import { t } from './i18n.ts';
 
 /** Server disconnect reasons (codes) to translatable texts. */
-const BYE: Record<string, string> = { 'opponent-left': 'Przeciwnik rozłączony', lag: 'Zbyt duże opóźnienie', desync: 'Rozsynchronizowano — mecz przerwany', 'no-room': 'Nie ma pokoju {0}', unknown: 'Koniec gry', end: 'Koniec meczu', 'no-match': 'Ten mecz już się skończył', full: 'Za dużo kibiców — spróbuj za chwilę', 'player-left': 'Gracz opuścił mecz' };
+const BYE: Record<string, string> = { 'opponent-left': 'Przeciwnik rozłączony', lag: 'Zbyt duże opóźnienie', desync: 'Rozsynchronizowano — mecz przerwany', 'no-room': 'Nie ma pokoju {0}', unknown: 'Koniec gry', end: 'Koniec meczu', 'no-match': 'Ten mecz już się skończył', full: 'Za dużo kibiców — spróbuj za chwilę', 'player-left': 'Gracz opuścił mecz', update: 'Zaktualizuj grę — ta wersja nie pasuje do serwera' };
 
 export class Net {
   status: 'connecting' | 'waiting' | 'room' | 'playing' | 'closed' = 'connecting';
@@ -30,7 +30,7 @@ export class Net {
    */
   constructor(url: string, join: { room?: string; config: Record<string, unknown>; token?: string; watch?: string } = { config: {} }) {
     this.ws = new WebSocket(url);
-    this.ws.onopen = () => this.send(join.watch ? { t: 'watch', id: join.watch } : { t: 'join', ...join });
+    this.ws.onopen = () => this.send(join.watch ? { t: 'watch', id: join.watch } : { t: 'join', sim: SIM_VERSION, ...join });
     this.ws.onmessage = (e) => { try { this.receive(JSON.parse(String(e.data))); } catch { /* ignore malformed */ } };
     this.ws.onerror = () => { this.message ||= t('Nie można połączyć z serwerem'); };
     this.ws.onclose = () => { this.message ||= t('Połączenie zerwane'); this.status = 'closed'; };

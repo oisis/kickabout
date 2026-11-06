@@ -49,7 +49,7 @@ function teamEditor(app: App, t: TeamDef) {
     h('table', { className: 'edit' },
       h('thead', {}, h('tr', {}, ...[tr('Zawodnik'), tr('Poz'), tr('Pod'), tr('Str'), tr('Gło'), tr('Odb'), tr('Kon'), tr('Szy'), tr('Bra')].map((x) => h('th', {}, x)))),
       h('tbody', {}, ...t.players.map((p) => h('tr', {},
-        h('td', {}, h('input', { value: p.name, maxLength: 20, oninput: (e: Event) => { p.name = (e.target as HTMLInputElement).value; } })),
+        h('td', {}, h('input', { value: p.name, maxLength: 28, oninput: (e: Event) => { p.name = (e.target as HTMLInputElement).value; } })),
         h('td', {}, h('select', { onchange: (e: Event) => { p.pos = (e.target as HTMLSelectElement).selectedIndex; } }, ...POS.map((x, i) => h('option', { selected: i === p.pos }, tr(x))))),
         ...(['pa', 'sh', 'he', 'ta', 'co', 'sp', 'gk'] as const).map((k) => h('td', {}, num(() => p[k], (v) => { p[k] = v; }))),
       ))),

@@ -48,7 +48,7 @@ export function makePlayers(id: string, level: number, lang: string): PlayerDef[
   const used = new Set<string>();
   return SQUAD_POS.map((pos) => {
     let name = '';
-    do name = `${first[rn(first.length)][0]}. ${last[rn(last.length)]}`; while (used.has(name));
+    do name = `${first[rn(first.length)]} ${last[rn(last.length)]}`; while (used.has(name)); // full first name: the commentary line and squads show it
     used.add(name);
     const v = (k: number) => clamp9(level + r(5) - 2 + BIAS[pos][k]);
     return { name, pos, pa: v(0), sh: v(1), he: v(2), ta: v(3), co: v(4), sp: v(5), gk: pos === 0 ? clamp9(level + r(5) - 1) : 0, age: 18 + r(16) };
@@ -213,7 +213,7 @@ export function sanitizeTeam(x: unknown): TeamDef | null {
   const n = (v: unknown, max: number) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= max ? (v as number) : 0);
   const str = (v: unknown, len: number) => String(v ?? '').slice(0, len);
   const kit = (k: Kit | undefined): Kit => ({ shirt: COLOR.test(k?.shirt ?? '') ? k!.shirt : '#dc2626', shorts: COLOR.test(k?.shorts ?? '') ? k!.shorts : '#f8fafc' });
-  const players = d.players.map((p) => ({ name: str(p?.name, 20) || '?', pos: n(p?.pos, 3), pa: n(p?.pa, 9), sh: n(p?.sh, 9), he: n(p?.he, 9), ta: n(p?.ta, 9), co: n(p?.co, 9), sp: n(p?.sp, 9), gk: n(p?.gk, 9), age: n(p?.age, 60) }));
+  const players = d.players.map((p) => ({ name: str(p?.name, 28) || '?', pos: n(p?.pos, 3), pa: n(p?.pa, 9), sh: n(p?.sh, 9), he: n(p?.he, 9), ta: n(p?.ta, 9), co: n(p?.co, 9), sp: n(p?.sp, 9), gk: n(p?.gk, 9), age: n(p?.age, 60) }));
   if (!players.some((p) => p.pos === 0)) return null;
   return {
     id: str(d.id, 20), name: str(d.name, 32) || '?', short: str(d.short, 3) || '???', national: !!d.national, country: str(d.country, 8), division: n(d.division, 2), level: n(d.level, 9),

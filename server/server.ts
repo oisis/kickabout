@@ -17,7 +17,7 @@ import { clubs } from './clubs.ts';
 import { live, type LiveMatch } from './live.ts';
 import { matchMinutes } from '../src/store.ts';
 import { onlineMatch } from '../src/data.ts';
-import { newMatch, step, type State } from '../src/sim.ts';
+import { newMatch, step, SIM_VERSION, type State } from '../src/sim.ts';
 import pkg from '../package.json' with { type: 'json' };
 
 export const VERSION: string = pkg.version;
@@ -209,6 +209,7 @@ export function startServer(port: number, opts: AccountOptions & { voice?: Voice
       try { msg = JSON.parse(String(data)); } catch { return; }
       const m = matches.get(ws);
       if (m) onMessage(ws, m, msg);
+      else if (msg.t === 'join' && msg.sim !== SIM_VERSION) { send(ws, { t: 'bye', why: 'update' }); ws.close(); } // an older or newer game would not stay in sync
       else if (msg.t === 'join' && !lobbyOf.has(ws) && waiting?.ws !== ws) enterLobby(ws, msg);
       else if (msg.t === 'watch') counters.inc('watch_requests', { result: fans.watch(ws, msg.id) ? 'ok' : 'refused' });
     });

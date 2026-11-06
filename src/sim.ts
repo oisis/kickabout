@@ -19,6 +19,8 @@ export const PEN_SPOT = 11264;
 // Input word: bits 0-4 controls, 5-7 command, 8-15 and 16-23 command arguments.
 export const UP = 1, DOWN = 2, LEFT = 4, RIGHT = 8, KICK = 16;
 export const CMD_PAUSE = 1, CMD_SUB = 2, CMD_TACTIC = 3;
+/** Bump whenever the same inputs give a different match: online players (and the server's copy) must agree. */
+export const SIM_VERSION = 2;
 export const cmd = (c: number, a = 0, b = 0) => (c << 5) | (a << 8) | (b << 16);
 
 export interface Skills { pos: number; pa: number; sh: number; he: number; ta: number; co: number; sp: number; gk: number }

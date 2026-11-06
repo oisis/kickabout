@@ -186,21 +186,34 @@ function shirtBody(ctx: CanvasRenderingContext2D, x: number, y: number, shirt: s
   ctx.lineJoin = 'miter';
 }
 
-const HAIR = ['#1c1410', '#3b2416', '#5a3820', '#8a5a2b', '#c9a061', '#2b2b2b', '#7a2e12', '#4a2c18', '#e0c48a'];
+const HAIR = ['#1c1410', '#3b2416', '#5a3820', '#8a5a2b', '#c9a061', '#2b2b2b', '#7a2e12', '#e0c48a'];
+const SKIN = '#e8b98a';
 
 /**
- * Head with hair: the hair is the head's own shape shifted back from where the player looks
- * (and up), clipped to the head, so the face shows on the side he is facing. Colour per player.
+ * Head and hair from above-front: the head is filled with the hair colour and the face is cut out on
+ * the side the player looks (none from behind), so there is a clear hairline. Per player: colour and
+ * style (short, curly, long, buzz cut). `lift` 0 = lying on the ground (no ears).
  */
 function head(ctx: CanvasRenderingContext2D, x: number, y: number, fx: number, fy: number, seed: number, lift: number) {
-  const r = 0.25 * M;
-  ellipse(ctx, x, y, r, r * 1.04, '#e8b98a');
+  const r = 0.25 * M, hair = HAIR[seed % HAIR.length], style = (seed >> 3) % 4;
+  if (style === 2) ellipse(ctx, x, y + r * 0.55, r * 0.98, r * 0.62, hair); // long: down to the shoulders, behind the head
   ctx.save();
-  ctx.beginPath(); ctx.ellipse(x, y, r, r * 1.04, 0, 0, Math.PI * 2); ctx.clip();
-  ellipse(ctx, x - fx * 0.13 * M, y - fy * 0.1 * M - lift, r * (seed % 3 === 0 ? 1.12 : 1.02), r * 0.95, HAIR[seed % HAIR.length]);
+  ctx.beginPath(); ctx.ellipse(x, y, r, r * 1.05, 0, 0, Math.PI * 2); ctx.clip();
+  ctx.fillStyle = style === 3 ? SKIN : hair; ctx.fillRect(x - r, y - r * 1.1, 2 * r, 2.2 * r);
+  if (style === 3) { ctx.globalAlpha = 0.55; ctx.fillStyle = hair; ctx.fillRect(x - r, y - r * 1.1, 2 * r, 2.2 * r); ctx.globalAlpha = 1; }
+  if (fy > -0.3) { // the face, towards where he looks and a little down
+    const v = Math.min(1, (fy + 1) / 2 + Math.abs(fx) * 0.35);
+    ellipse(ctx, x + fx * r * 0.42, y + r * 0.42 + fy * r * 0.1, r * 0.9 * v * (1 - Math.abs(fx) * 0.25), r * 0.75 * v, SKIN);
+  }
+  ctx.globalAlpha = 0.18; ellipse(ctx, x - fx * r * 0.3 - r * 0.25, y - r * 0.55, r * 0.35, r * 0.18, '#fff'); ctx.globalAlpha = 1; // shine
   ctx.restore();
-  ctx.lineWidth = 0.03 * M; ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-  ctx.beginPath(); ctx.ellipse(x, y, r, r * 1.04, 0, 0, Math.PI * 2); ctx.stroke();
+  if (style === 1) for (let k = -2; k <= 2; k++) ellipse(ctx, x + k * r * 0.42 - fx * r * 0.15, y - r * 0.92 + Math.abs(k) * r * 0.18, r * 0.26, r * 0.24, hair); // curls
+  if (lift) {
+    if (fy > 0.3) for (const sx of [-1, 1]) ellipse(ctx, x + sx * r * 0.97, y + r * 0.12, r * 0.13, r * 0.18, SKIN); // ears
+    else if (fy <= -0.3 && Math.abs(fx) > 0.3) ellipse(ctx, x + Math.sign(fx) * r * 0.9, y + r * 0.1, r * 0.13, r * 0.18, SKIN); // half turned away: one ear
+  }
+  ctx.lineWidth = 0.03 * M; ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+  ctx.beginPath(); ctx.ellipse(x, y, r, r * 1.05, 0, 0, Math.PI * 2); ctx.stroke();
 }
 
 /** Squad number on the shirt, dark or light depending on the shirt colour. */
