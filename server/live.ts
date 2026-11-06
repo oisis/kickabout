@@ -75,7 +75,7 @@ export function live() {
       return [...matches.values()].map((m) => ({
         id: m.id, kind: m.kind, started: m.started, home: side(m.config.home), away: side(m.config.away),
         score: m.sim.score, minute: minute(m.sim), phase: m.sim.phase, period: m.sim.period, spectators: m.spectators.size,
-      })).sort((a, b) => b.spectators - a.spectators || a.started - b.started);
+      })).sort((a, b) => a.started - b.started); // stable: a card never jumps away from under the cursor
     },
     /** How many watch any match. */
     watchers: () => watching.size,

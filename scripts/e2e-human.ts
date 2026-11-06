@@ -493,6 +493,14 @@ async function webPhase(A: Device) {
 async function multiPhase(A: Device, B: Device) {
   const code = process.env.CODE_A ?? '';
   if (!code) { check('multi: CODE_A from the website account page', false); return; }
+  log('13. Domyślny adres serwera w aplikacji');
+  await B.js(`localStorage.removeItem('server')`);
+  for (let i = 0; i < 3 && !(await B.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await B.tap('← Wstecz').catch(() => B.tap('OK')).catch(() => {});
+  await B.tap('Gra online');
+  const address = await B.js<string>(`${B.field('Adres serwera', 'input')}.value`);
+  check('13: the app suggests kickabout.oisis.pl', /kickabout\.oisis\.pl/.test(address), address);
+  B.snap('domyslny-serwer');
+  await B.tap('← Wstecz');
   log('13. Klub online z prawdziwego konta na A');
   for (let i = 0; i < 3 && !(await A.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await A.tap('← Wstecz').catch(() => A.tap('OK')).catch(() => {});
   await A.tap('Mój klub (online)'); await sleep(2000);
