@@ -480,6 +480,7 @@ async function main() {
   if (goals) { await A.tap('▶', { sel: 'li button', translate: false }); await sleep(4000); A.snap('powtorka'); }
 
   log('6. Odnośnik do strony www z menu aplikacji');
+  await waitFor('6: replay finished', 60_000, async () => !(await A.js<boolean>(`document.querySelector('#ui').hidden`)));
   for (let i = 0; i < 3 && !(await A.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await A.tap('← Wstecz').catch(() => {});
   await A.tap('Strona www i konto');
   await sleep(5000);

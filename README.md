@@ -1,16 +1,30 @@
 # Kickabout
 
-Zręcznościowa piłka nożna z widokiem z góry, 11 na 11, na Androida (APK) i przeglądarkę, ze stroną www, kontami graczy i grą online.
+Zręcznościowa piłka nożna z widokiem z góry, 11 na 11, na Androida (APK) i przeglądarkę, ze stroną www, kontami graczy, klubami online i grą online.
 
-Repozytorium: `git@github.com:oisis/kickabout.git`.
+## Zrzuty ekranu
 
-```sh
-npm install
-npm run dev                         # sama gra: http://<IP-komputera>:5173
-npm test                            # symulacja, rozgrywki, kariera, serwer, konta
-docker compose up --build           # strona + gra + API: http://localhost:8080 (gra pod /play/)
-ANDROID_HOME=~/Android/Sdk npm run apk   # APK debug i release → apk/kickabout.apk
-```
+**Android**
+
+| | | |
+|---|---|---|
+| <img src="docs/screenshots/android-1-menu.png" width="250" alt="Menu główne"> | <img src="docs/screenshots/android-2-match.png" width="250" alt="Mecz"> | <img src="docs/screenshots/android-3-club.png" width="250" alt="Mój klub"> |
+| Menu główne | Mecz: numery, przyciski PODANIE i STRZAŁ | Mój klub online: monety, ocena, sponsorzy |
+| <img src="docs/screenshots/android-4-market.png" width="250" alt="Rynek transferowy"> | <img src="docs/screenshots/android-5-club-match.png" width="250" alt="Mecz klubów online"> | |
+| Rynek transferowy: skład klubu komputera | Mecz online klubów: sponsor przed meczem | |
+
+<img src="docs/screenshots/android-6-landscape.png" width="770" alt="Mecz w poziomie">
+
+Widok poziomy.
+
+**Strona www**
+
+| | |
+|---|---|
+| <img src="docs/screenshots/www-1-home.png" width="420" alt="Strona główna"> | <img src="docs/screenshots/www-2-account.png" width="420" alt="Konto"> |
+| Strona główna z pobieraniem APK | Konto: klub, monety, połączenie aplikacji |
+| <img src="docs/screenshots/www-3-game-club.png" width="220" alt="Gra w przeglądarce — Mój klub"> | <img src="docs/screenshots/www-4-game-kits.png" width="220" alt="Stroje i barwy"> |
+| Gra w przeglądarce: Mój klub (sesja ze strony) | Stroje i barwy klubu |
 
 ## Co jest w grze
 
@@ -27,7 +41,9 @@ ANDROID_HOME=~/Android/Sdk npm run apk   # APK debug i release → apk/kickabout
   - mecz towarzyski (gracz kontra komputer, 2 graczy na jednym urządzeniu, komputer kontra komputer);
   - rozgrywki: liga, puchar (jeden mecz albo dwumecz z bramkami na wyjeździe), turniej (grupy + puchar), gotowe albo własne;
   - kariera (20 sezonów);
-  - gra online.
+  - gra online;
+  - klub online (konto na stronie).
+- **Klub online** (wymaga konta, zob. [Klub online i monety](#klub-online-i-monety)): własna drużyna z losowymi, słabymi zawodnikami, monety, rynek transferowy, wymiany, kupno klubu, sponsoring, stroje, nagrody za mecze.
 - **Kariera:** grający trener albo trener, dwie ligi z awansem i spadkiem, puchar, finanse, rynek transferowy, oferty pracy, starzenie się zawodników.
 - **Edytory:** drużyny (nazwy, stroje, zawodnicy, umiejętności) i taktyki (przeciąganie zawodników).
 - **Najlepsze momenty:** gole zapisują się automatycznie, można je odtwarzać, eksportować i importować.
@@ -48,6 +64,16 @@ ANDROID_HOME=~/Android/Sdk npm run apk   # APK debug i release → apk/kickabout
 
 - **Dźwięk:** prawdziwe nagrania na licencji CC0 (kopnięcia, gwizdek, radość po golu, tło trybun) i muzyka w menu. Źródła są w `public/audio/CREDITS.md`. Gdy któregoś pliku brakuje, gra używa dźwięku syntezowanego.
 
+## Uruchamianie i budowanie
+
+```sh
+npm install
+npm run dev                              # sama gra: http://<IP-komputera>:5173
+npm test                                 # symulacja, rozgrywki, kariera, serwer, konta, kluby
+docker compose up --build                # strona + gra + API: http://localhost:8080 (gra pod /play/)
+ANDROID_HOME=~/Android/Sdk npm run apk   # APK debug i release → apk/kickabout.apk
+```
+
 ## Architektura
 
 Dwie usługi, każda z własnym obrazem Dockera:
@@ -64,6 +90,31 @@ Gra:
 - `src/match.ts`: prowadzi mecz lokalnie albo online, nagrywa wejścia i wyzwala dźwięki.
 - `src/screens.ts`, `compScreens.ts`, `careerScreens.ts`, `editors.ts`: menu w HTML. `src/render.ts`: canvas.
 
+## Klub online i monety
+
+Wszystkie salda i składy zmienia wyłącznie serwer. Zasady i ceny są w `src/economy.ts`.
+
+- **Start:** każde konto dostaje 3000 monet.
+- **Nowy klub:** dostaje 16 losowych zawodników (ocena ok. 2–3, słabiej niż większość IV lig). Barwy wybierasz przy zakładaniu.
+- **Stroje:** w „Strojach i barwach” kupujesz nowe stroje: domowy, wyjazdowy i bramkarza, po 400 monet za każdy zmieniony komplet.
+- **Ceny zawodników:** cena podwaja się co 1,1 punktu umiejętności, młodzi są drożsi, weterani tańsi. Przykładowo: ocena 3 to ok. 400, ocena 5 to ok. 1400, ocena 7 to ok. 4900, ocena 9 to ok. 17 400.
+- **Klub komputera:**
+  - kupno zawodnika kosztuje 125% ceny i dzieje się od razu;
+  - wymiana od razu: dopłacasz 110% różnicy wartości albo dostajesz 80% różnicy;
+  - sprzedaż na rynek daje 60% ceny.
+- **Klub innego gracza:** kupno, wymiana i kupno całego klubu to oferty, które właściciel przyjmuje albo odrzuca.
+- **Kupno klubu:** dowolny z 384 klubów lub klub gracza. Cena to 150% wartości składu plus 5000. Jeden gracz ma jeden klub.
+- **Sponsoring:** przelew do klubu innego gracza. Nazwa sponsora pojawia się przed meczem i na bandach reklamowych wokół boiska.
+- **Nagrody za mecze:**
+  - wygrana 200, remis 70, przegrana 20, plus 10 za gola;
+  - mnożnik ×2 na każde 2 punkty oceny drużyny;
+  - premia za pokonanie silniejszego rywala;
+  - mecze z komputerem płacą połowę;
+  - dziennie płatnych jest 10 meczów z komputerem i 20 online.
+- **Weryfikacja wyników:** mecz z komputerem serwer odtwarza z zapisu wejść gracza (symulacja jest deterministyczna). Mecz online klubów serwer symuluje sam z rozsyłanych klatek.
+- **Bezczynność:** klub, którym właściciel nie zarządza przez 30 dni, wraca pod zarząd komputera.
+- **Aplikacja:** w panelu konta na stronie wybierz „Połącz aplikację” i wpisz kod w grze („Mój klub (online)”). Gra w przeglądarce używa sesji strony.
+
 ## Konta graczy
 
 Logowanie przez Google i GitHub (OAuth 2.0). Na stronie `/account.html` gracz zmienia nazwę, łączy i odłącza metody logowania, widzi zalogowane urządzenia, wylogowuje inne urządzenia i usuwa konto.
@@ -75,6 +126,7 @@ Konfiguracja API (zmienne środowiskowe):
 | `PUBLIC_URL` | publiczny adres strony, np. `https://kickabout.example.com` (adresy powrotu OAuth, ciasteczka `Secure` przy https) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → OAuth client ID (Web), redirect URI: `<PUBLIC_URL>/api/auth/google/callback` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | [GitHub → Settings → Developer settings → OAuth Apps](https://github.com/settings/developers), callback URL: `<PUBLIC_URL>/api/auth/github/callback` |
+| `API_URL`, `COOKIE_DOMAIN` | tryb subdomeny: API pod `https://api.example.pl`, ciasteczko wspólne dla `example.pl` |
 | `DEV_LOGIN=1` | logowanie samym imieniem, tylko do testów |
 | `DB_PATH` | plik SQLite (w obrazie `/data/kickabout.db`) |
 
@@ -95,6 +147,11 @@ Murawę i zasady ustala założyciel pokoju (w szybkiej grze: gracz, który czek
 ## Wdrożenie
 
 **Docker Compose:** `docker compose up --build` uruchamia oba obrazy. Dane OAuth wpisz do `.env` (zmienne z tabeli wyżej). Lokalnie domyślnie działa `DEV_LOGIN=1`.
+
+**Adres API:** domyślnie API działa pod ścieżką strony (`www.example.pl/api`, WebSocket `/ws`). Można też użyć subdomeny (`api.example.pl`):
+- w Helm ustaw `apiUrl=https://api.example.pl`, `ingress.apiHost=api.example.pl` i `cookieDomain=example.pl`;
+- strona i gra w przeglądarce dostają adres API w `config.js`, generowanym przy starcie kontenera ze zmiennej `PUBLIC_API_URL`;
+- APK dostaje adres przy budowaniu (`VITE_API`, `VITE_SERVER`, `VITE_SITE`).
 
 **Kubernetes (Helm):** chart `deploy/helm/kickabout`:
 
@@ -120,12 +177,28 @@ helm upgrade --install kickabout deploy/helm/kickabout -n kickabout --create-nam
 
 Strona: `https://kickabout.localhost` (Traefik, certyfikat domyślny) oraz `http://172.16.0.10:30080` dla telefonów w sieci lokalnej.
 
+## Wersje
+
+Wersjonowanie semantyczne. Jedynym źródłem wersji jest `package.json`. Z niej korzystają:
+- Android: `versionName`, a `versionCode` = major·10000 + minor·100 + patch;
+- chart Helm: `version` i `appVersion` (domyślny tag obrazów);
+- API: `/version`;
+- menu gry i stopka strony.
+
+Wydanie nowej wersji:
+
+```sh
+npm version minor        # albo patch / major: package.json + Chart.yaml, commit i tag v2.1.0
+git push --follow-tags   # CI: obrazy 2.1.0, 2.1 i 2, GitHub Release z APK
+```
+
 ## CI/CD
 
 `.github/workflows/release.yml`:
 - każdy push i pull request: testy;
 - push na `main`: APK oraz obrazy `ghcr.io/oisis/kickabout-{api,web}` z tagami `latest` i `sha-<commit>` (amd64 + arm64);
-- tag `v1.2.3`: obrazy `1.2.3` i `1.2` oraz GitHub Release z APK.
+- tag `v1.2.3` (musi zgadzać się z `package.json`): obrazy `1.2.3`, `1.2` i `1` oraz GitHub Release z APK;
+- przed publikacją obraz API przechodzi test dymny (start, `/healthz`, `/version`, lista klubów).
 
 Ustawienia repozytorium:
 - zmienna `PUBLIC_URL`: adres, z którym łączy się APK;
@@ -141,7 +214,7 @@ docker pull ghcr.io/oisis/kickabout-web:latest
 
 ## Testy na emulatorach
 
-`scripts/e2e-human.ts`: pełna sesja na dwóch emulatorach z APK debug. Przechodzi opcje, edytory drużyn i taktyk, mecz towarzyski, ligę, pokój online z pauzą i zmianą, szybką grę, najlepsze momenty i odnośnik do strony. Przykład: `SERVER=172.16.0.10:30080/ws node scripts/e2e-human.ts`.
+`scripts/e2e-human.ts`: pełna sesja na dwóch emulatorach z APK debug. Przechodzi opcje, edytory drużyn i taktyk, mecz towarzyski, ligę, pokój online z pauzą i zmianą, szybką grę, najlepsze momenty i odnośnik do strony. Fazy wybierasz zmienną `PHASES`: `basic` to cała gra, `club` to klub online z kodami ze strony (`CODE_A`, `CODE_B`). Przykład: `PHASES=basic SERVER=172.16.0.10:30080/ws node scripts/e2e-human.ts`.
 
 ## APK
 
