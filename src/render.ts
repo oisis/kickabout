@@ -153,8 +153,8 @@ function player(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, view: 
   ctx.lineCap = 'butt';
   ctx.fillStyle = kit.shorts;
   ctx.fillRect(p.x - 0.28 * M, p.y - 1.05 * M - bob, 0.56 * M, 0.32 * M);
-  ellipse(ctx, p.x, p.y - 1.35 * M - bob, 0.42 * M, 0.45 * M, shirt);
-  shirtNumber(ctx, p.n + 1, p.x, p.y - 1.32 * M - bob, shirt);
+  shirtBody(ctx, p.x, p.y - 1.74 * M - bob, shirt, swing);
+  shirtNumber(ctx, p.n + 1, p.x, p.y - 1.33 * M - bob, shirt);
   if (p.yel) { ctx.fillStyle = '#facc15'; ctx.fillRect(p.x + 0.2 * M, p.y - 1.6 * M - bob, 0.14 * M, 0.2 * M); }
   const hx = p.x + fx * 0.08 * M, hy = p.y - 2.0 * M + fy * 0.05 * M - bob;
   ellipse(ctx, hx, hy, 0.25 * M, 0.26 * M, '#e8b98a');
@@ -171,10 +171,27 @@ function player(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, view: 
   }
 }
 
+// A football shirt seen from above-front, in units of M from the collar (x right, y down):
+// V-neck, shoulders, short sleeves, straight body down to the shorts.
+const SHIRT: [number, number][] = [[-0.13, 0], [0, 0.1], [0.13, 0], [0.34, 0.05], [0.56, 0.26], [0.44, 0.4], [0.31, 0.3], [0.3, 0.72], [-0.3, 0.72], [-0.31, 0.3], [-0.44, 0.4], [-0.56, 0.26], [-0.34, 0.05]];
+
+/** Arms swinging against the legs, then the shirt over them. */
+function shirtBody(ctx: CanvasRenderingContext2D, x: number, y: number, shirt: string, swing: number) {
+  ctx.strokeStyle = '#e8b98a'; ctx.lineWidth = 0.13 * M; ctx.lineCap = 'round';
+  for (const side of [-1, 1]) line(ctx, x + side * 0.47 * M, y + 0.36 * M, x + side * 0.52 * M, y + (0.66 + side * swing * 0.06) * M);
+  ctx.lineCap = 'butt';
+  ctx.beginPath();
+  SHIRT.forEach(([dx, dy], k) => (k ? ctx.lineTo : ctx.moveTo).call(ctx, x + dx * M, y + dy * M));
+  ctx.closePath();
+  ctx.fillStyle = shirt; ctx.fill();
+  ctx.lineJoin = 'round'; ctx.lineWidth = 0.04 * M; ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.stroke();
+  ctx.lineJoin = 'miter';
+}
+
 /** Squad number on the shirt, dark or light depending on the shirt colour. */
 function shirtNumber(ctx: CanvasRenderingContext2D, n: number, x: number, y: number, shirt: string) {
   const c = parseInt(shirt.slice(1), 16), light = ((c >> 16) * 299 + ((c >> 8) & 255) * 587 + (c & 255) * 114) / 1000 > 150;
-  ctx.font = `800 ${0.5 * M}px system-ui, sans-serif`;
+  ctx.font = `800 ${0.36 * M}px system-ui, sans-serif`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = light ? '#111827' : '#fff';
   ctx.fillText(String(n), x, y);
