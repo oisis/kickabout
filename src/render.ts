@@ -4,11 +4,11 @@ import {
   type State, type Player, W, H, M, GOAL_HALF, CROSSBAR, BOX_HALF, BOX_DEPTH,
   AREA_HALF, AREA_DEPTH, CIRCLE_R, PEN_SPOT, minute,
 } from './sim.ts';
-import { type Controls, STICK_R, PAUSE_BTN, SHOT_BTN, PASS_BTN } from './input.ts';
+import { type Controls, STICK_R, PAUSE_BTN, MIC_BTN, SHOT_BTN, PASS_BTN } from './input.ts';
 import type { MatchInfo } from './store.ts';
 import { t, EVENT_TEXT } from './i18n.ts';
 
-export interface View { humans: number[]; me: number; overlay: string; replay: string }
+export interface View { humans: number[]; me: number; overlay: string; replay: string; voice?: { muted: boolean; state: string } }
 
 // Grass stripe colours per pitch surface (see PITCHES).
 const GRASS = [['#a7c4c9', '#b7d2d6'], ['#5b6b2f', '#66763a'], ['#256f33', '#2b7a39'], ['#2c8035', '#328a3c'], ['#2a8235', '#2f8f3a'], ['#4f8a2c', '#588f33'], ['#6b8c35', '#76963d']];
@@ -64,6 +64,19 @@ function pitch(ctx: CanvasRenderingContext2D, surface: number) {
   net(ctx, W / 2 - GOAL_HALF, -2 * M - CROSSBAR, GOAL_HALF * 2, 2 * M);
   net(ctx, W / 2 - GOAL_HALF, H - CROSSBAR, GOAL_HALF * 2, 2 * M + CROSSBAR);
   goalFrame(ctx, 0);
+}
+
+/** Voice chat button: a microphone (struck through when muted) and a dot for the connection. */
+function mic(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, v: { muted: boolean; state: string }) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = v.muted ? 'rgba(127,29,29,0.75)' : 'rgba(0,0,0,0.45)'; ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#fff'; ctx.lineWidth = r * 0.1; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.roundRect(x - r * 0.18, y - r * 0.55, r * 0.36, r * 0.65, r * 0.18); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y - r * 0.05, r * 0.33, 0, Math.PI); ctx.stroke();
+  line(ctx, x, y + r * 0.28, x, y + r * 0.48);
+  if (v.muted) { ctx.strokeStyle = '#f87171'; ctx.lineWidth = r * 0.14; line(ctx, x - r * 0.5, y - r * 0.5, x + r * 0.5, y + r * 0.5); }
+  ctx.lineCap = 'butt';
+  ctx.beginPath(); ctx.arc(x + r * 0.7, y - r * 0.7, r * 0.2, 0, Math.PI * 2);
+  ctx.fillStyle = v.state === 'connected' ? '#4ade80' : v.state === 'failed' ? '#f87171' : '#facc15'; ctx.fill();
 }
 
 /** Advertising boards beyond both touchlines: the home side's sponsors on the left, the away side's on the right. */
@@ -243,6 +256,7 @@ function hud(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, cw: numbe
   ctx.fillStyle = '#fff';
   ctx.fillRect(px - pr * 0.35, py - pr * 0.4, pr * 0.22, pr * 0.8);
   ctx.fillRect(px + pr * 0.13, py - pr * 0.4, pr * 0.22, pr * 0.8);
+  if (view.voice) mic(ctx, cw + MIC_BTN.x * dpr, MIC_BTN.y * dpr, MIC_BTN.r * dpr, view.voice);
 
   ctx.textAlign = 'center';
   if (view.replay) {

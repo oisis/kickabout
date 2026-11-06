@@ -10,6 +10,7 @@ import { UP, DOWN, LEFT, RIGHT, KICK, vecBits } from './sim.ts';
 
 export const STICK_R = 60; // CSS px
 export const PAUSE_BTN = { x: -44, y: 44, r: 30 }; // CSS px from the top-right corner
+export const MIC_BTN = { x: -112, y: 44, r: 26 }; // voice chat: mute my microphone
 /** Button centres in CSS px from the bottom-right corner. */
 export const SHOT_BTN = { x: -78, y: -100, r: 52 };
 export const PASS_BTN = { x: -190, y: -62, r: 44 };
@@ -52,6 +53,7 @@ export class Controls {
   keys = new Set<string>();
   twoPlayers = false;
   onPause = () => {};
+  onMic: (() => void) | null = null; // set while a voice chat runs
   private padStart = [false, false];
 
   constructor(el: HTMLElement) {
@@ -67,6 +69,7 @@ export class Controls {
       if (e.pointerType === 'mouse') return;
       this.touch = true;
       if (Math.hypot(e.clientX - (innerWidth + PAUSE_BTN.x), e.clientY - PAUSE_BTN.y) < PAUSE_BTN.r + 10) return this.onPause();
+      if (this.onMic && Math.hypot(e.clientX - (innerWidth + MIC_BTN.x), e.clientY - MIC_BTN.y) < MIC_BTN.r + 8) return this.onMic();
       el.setPointerCapture(e.pointerId);
       if (e.clientX > innerWidth * 0.55) {
         // Right side: whichever button is nearer.

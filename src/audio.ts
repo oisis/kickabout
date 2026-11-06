@@ -6,7 +6,7 @@ let ctx: AudioContext | null = null;
 let noise: AudioBuffer | null = null;
 let crowd: { gain: GainNode } | null = null;
 let music: { stop: () => void; synth: boolean } | null = null;
-export const audio = { sound: true, music: true };
+export const audio = { sound: true, music: true, duck: 1 }; // duck < 1: the crowd is quieter during a voice chat
 
 const FILES = { kick: 'kick.ogg', kick2: 'kick2.ogg', whistle: 'whistle.ogg', goal: 'goal.ogg', crowd: 'crowd.ogg', menu: 'menu.ogg' };
 type Sample = keyof typeof FILES;
@@ -134,7 +134,7 @@ export function crowdLevel(level: number) {
     src.start();
     crowd = { gain };
   }
-  if (crowd) crowd.gain.gain.setTargetAtTime(samples.crowd ? 0.25 + level * 0.6 : 0.02 + level * 0.07, c.currentTime, 0.4);
+  if (crowd) crowd.gain.gain.setTargetAtTime((samples.crowd ? 0.25 + level * 0.6 : 0.02 + level * 0.07) * audio.duck, c.currentTime, 0.4);
 }
 
 const TUNE = [64, 67, 71, 72, 71, 67, 64, 62, 64, 67, 69, 67, 64, 60, 62, 64];

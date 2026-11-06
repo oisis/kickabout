@@ -39,6 +39,23 @@ web:
     requests: { cpu: 20m, memory: 32Mi }
     limits: { memory: 128Mi }
 
+# Voice chat (private rooms): STUN finds a direct path; TURN relays when there is none.
+voice:
+  stun: [stun:stun.l.google.com:19302]
+
+turn:
+  enabled: false
+  image: coturn/coturn:4.6.3
+  externalIp: ""          # public IP of the node clients reach
+  port: 3478
+  minPort: 49160          # relay ports (UDP) to open in the firewall
+  maxPort: 49200
+  secret: ""              # shared with the API; clients get credentials valid for an hour
+  urls: []                # e.g. [turn:turn.example.pl:3478?transport=udp, turn:turn.example.pl:3478?transport=tcp]
+  resources:
+    requests: { cpu: 20m, memory: 32Mi }
+    limits: { memory: 128Mi }
+
 ingress:
   enabled: true
   className: nginx

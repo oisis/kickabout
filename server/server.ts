@@ -9,6 +9,7 @@ import { randomInt } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { IncomingMessage } from 'node:http';
 import { accounts, envProviders, type AccountOptions } from './accounts.ts';
+import { iceServers, voiceFromEnv, MAX_SIGNAL, MAX_SIGNALS, type VoiceOptions } from './voice.ts';
 import { clubs } from './clubs.ts';
 import { matchMinutes } from '../src/store.ts';
 import { onlineMatch } from '../src/data.ts';
@@ -24,13 +25,15 @@ interface Match {
   players: WebSocket[]; inputs: Map<number, number>[]; next: number; hashes: Map<number, number>;
   /** Prize money: the signed-in owner of each side's club (or null) and the server's own copy of the match. */
   users: (number | null)[]; ratings: number[]; sim: State | null; note: string;
+  /** Voice chat: both players of a private room switched it on; signalling messages relayed so far. */
+  voice: boolean; signals: number;
 }
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a);
 const send = (ws: WebSocket, msg: object) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); };
 const isTick = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 
-export function startServer(port: number, opts: AccountOptions = {}): Server {
+export function startServer(port: number, opts: AccountOptions & { voice?: VoiceOptions } = {}): Server {
   let club!: ReturnType<typeof clubs>;
   const api = accounts(opts, [(c) => club.route(c)]);
   club = clubs(api.db);
@@ -58,16 +61,22 @@ export function startServer(port: number, opts: AccountOptions = {}): Server {
     for (const p of m.players) { matches.delete(p); send(p, { t: 'bye', why }); p.close(); }
   }
 
-  function start(host: Lobby, guest: Lobby) {
+  function start(host: Lobby, guest: Lobby, room: boolean) {
     const [a, b] = [host.ws, guest.ws];
-    const m: Match = { players: [a, b], inputs: [new Map(), new Map()], next: 0, hashes: new Map(), users: [host.user, guest.user], ratings: [0, 0], sim: null, note: '' };
+    // Voice only between friends in a private room (P2P reveals addresses) and only if both want it.
+    const voice = room && host.config.voice === true && guest.config.voice === true;
+    const m: Match = { players: [a, b], inputs: [new Map(), new Map()], next: 0, hashes: new Map(), users: [host.user, guest.user], ratings: [0, 0], sim: null, note: '', voice, signals: 0 };
     const seed = randomInt(1, 2 ** 32 - 1);
     // The host's settings win, except the match length: each player proposes one and a disagreement
     // is settled by a draw between the two. Clients validate what they receive.
     const [hm, gm] = [host.config.minutes, guest.config.minutes].map(matchMinutes);
     const minutes = hm === gm ? hm : [hm, gm][randomInt(2)];
     const config = { ...host.config, minutes, minutesDrawn: hm !== gm, home: host.config.team, away: guest.config.team };
-    m.players.forEach((p, side) => { matches.set(p, m); lobbyOf.delete(p); send(p, { t: 'start', seed, side, delay: DELAY, config }); });
+    const ice = voice ? iceServers(opts.voice) : [];
+    m.players.forEach((p, side) => {
+      matches.set(p, m); lobbyOf.delete(p);
+      send(p, { t: 'start', seed, side, delay: DELAY, config, voice: voice ? { iceServers: ice, initiator: side === 0 } : null });
+    });
     if (m.users.some((u) => u !== null) && m.users[0] !== m.users[1]) { // a club match between two different players
       const { home, away, setup } = onlineMatch(config);
       m.sim = newMatch(seed, setup);
@@ -77,7 +86,7 @@ export function startServer(port: number, opts: AccountOptions = {}): Server {
     log('nowy mecz, ziarno', seed, '— aktywnych meczów:', new Set(matches.values()).size);
   }
 
-  function onMessage(ws: WebSocket, m: Match, msg: { t?: unknown; k?: unknown; b?: unknown; h?: unknown }) {
+  function onMessage(ws: WebSocket, m: Match, msg: { t?: unknown; k?: unknown; b?: unknown; h?: unknown; d?: unknown }) {
     const side = m.players.indexOf(ws);
     if (msg.t === 'in' && isTick(msg.k) && Number.isInteger(msg.b)) {
       if (msg.k < m.next || msg.k > m.next + MAX_AHEAD) return end(m, 'lag');
@@ -92,6 +101,10 @@ export function startServer(port: number, opts: AccountOptions = {}): Server {
           if (m.sim.phase === 'end') payOut(m);
         }
       }
+    } else if (msg.t === 'rtc' && m.voice && msg.d && typeof msg.d === 'object') {
+      // WebRTC signalling for the voice chat, passed to the other player untouched.
+      if (++m.signals > MAX_SIGNALS || JSON.stringify(msg.d).length > MAX_SIGNAL) return;
+      send(m.players[1 - side], { t: 'rtc', d: msg.d });
     } else if (msg.t === 'hash' && isTick(msg.k) && Number.isInteger(msg.h)) {
       const other = m.hashes.get(msg.k);
       if (other === undefined) m.hashes.set(msg.k, msg.h as number);
@@ -126,9 +139,9 @@ export function startServer(port: number, opts: AccountOptions = {}): Server {
       const code = msg.room.toUpperCase(), host = rooms.get(code);
       if (!host || host.ws.readyState !== WebSocket.OPEN) { send(ws, { t: 'bye', why: 'no-room', room: code }); return ws.close(); }
       rooms.delete(code);
-      return start(host, me);
+      return start(host, me, true);
     }
-    if (waiting && waiting.ws.readyState === WebSocket.OPEN) { const host = waiting; waiting = null; return start(host, me); }
+    if (waiting && waiting.ws.readyState === WebSocket.OPEN) { const host = waiting; waiting = null; return start(host, me, false); }
     waiting = me;
     send(ws, { t: 'wait' });
   }
@@ -162,7 +175,7 @@ if (import.meta.main) {
   const providers = envProviders();
   startServer(port, {
     db: env.DB_PATH ?? 'kickabout.db', publicUrl: env.PUBLIC_URL ?? `http://localhost:${port}`, apiUrl: env.API_URL || undefined,
-    cookieDomain: env.COOKIE_DOMAIN || undefined, providers, devLogin: env.DEV_LOGIN === '1',
+    cookieDomain: env.COOKIE_DOMAIN || undefined, providers, devLogin: env.DEV_LOGIN === '1', voice: voiceFromEnv(),
   }).on('listening', () => {
     const ips = Object.values(networkInterfaces()).flat().filter((i) => i?.family === 'IPv4' && !i.internal).map((i) => i!.address);
     log(`Kickabout API ${VERSION} na porcie ${port}; logowanie: ${[...Object.keys(providers), ...(env.DEV_LOGIN === '1' ? ['dev'] : [])].join(', ') || 'wyłączone'}.`);

@@ -3,10 +3,12 @@ import { Controls } from './input.ts';
 import { render } from './render.ts';
 import { MatchRun, type MatchSpec } from './match.ts';
 import { type Highlight, addHighlights, options } from './store.ts';
-import { show } from './ui.ts';
+import { show, toast } from './ui.ts';
 import { audio, menuMusic, crowdLevel } from './audio.ts';
 import * as screens from './screens.ts';
 import { t } from './i18n.ts';
+import { Voice } from './voice.ts';
+import { audio as sound } from './audio.ts';
 
 const canvas = document.querySelector('canvas')!;
 const ctx = canvas.getContext('2d')!;
@@ -25,6 +27,7 @@ export type EndHandler = (s: State, run: MatchRun) => void;
 /** App state: either a menu is shown, a match runs, or a saved highlight plays. */
 export class App {
   run: MatchRun | null = null;
+  voice: Voice | null = null; // voice chat of the current online match (private room, both agreed)
   viewer: { h: Highlight; s: State; i: number; done: () => void } | null = null;
   private onEnd: EndHandler | null = null;
   private ended = false;
@@ -39,6 +42,7 @@ export class App {
   }
 
   menu() {
+    this.endVoice();
     this.run?.spec.net?.close(); // leaving a finished online match must free the opponent too
     this.run = null;
     this.viewer = null;
@@ -61,9 +65,29 @@ export class App {
 
   /** Leave the running match without a result. */
   quitMatch() {
+    this.endVoice();
     this.run?.spec.net?.close();
     this.run = null;
     this.menu();
+  }
+
+  /** Starts the voice chat for an online match where both players of the room chose it. */
+  startVoice(net: NonNullable<MatchSpec['net']>) {
+    this.endVoice();
+    if (!net.voice || !globalThis.RTCPeerConnection) return;
+    const v = new Voice((d) => net.signal(d), net.voice);
+    net.onSignal = (d) => v.receive(d);
+    this.voice = v;
+    sound.duck = 0.4;
+    controls.onMic = () => v.toggleMute();
+    setTimeout(() => { if (v.micError && this.voice === v) toast(t('Brak dostępu do mikrofonu — słyszysz przeciwnika')); }, 3000);
+  }
+
+  endVoice() {
+    this.voice?.close();
+    this.voice = null;
+    sound.duck = 1;
+    controls.onMic = null;
   }
 
   playHighlight(h: Highlight, done: () => void) {
@@ -116,6 +140,7 @@ export class App {
     render(ctx, r ? r.s : run.s, run.info, controls, {
       humans: net ? [net.side === 0 ? 1 : 0, net.side === 1 ? 1 : 0] : run.spec.humans,
       me: run.me, overlay, replay: r ? r.title : '',
+      voice: this.voice && !r ? { muted: this.voice.muted, state: this.voice.state } : undefined,
     });
   }
 

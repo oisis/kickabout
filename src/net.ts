@@ -16,7 +16,9 @@ export class Net {
   delay = 6;
   frames = new Map<number, [number, number]>();
   reward: number | null = null; // prize money the server paid after a club match
+  voice: { iceServers: RTCIceServer[]; initiator: boolean } | null = null; // both players of a room chose voice chat
   onStart = () => {};
+  onSignal: (d: any) => void = () => {}; // WebRTC signalling from the other player (voice.ts)
   private ws: WebSocket;
 
   /** room: undefined = quick match, 'new' = create a private room, or a room code to join; token: the app's account (club matches). */
@@ -28,17 +30,19 @@ export class Net {
     this.ws.onclose = () => { this.message ||= t('Połączenie zerwane'); this.status = 'closed'; };
   }
 
-  private receive(m: { t: string; seed?: number; side?: number; delay?: number; k?: number; b?: number[]; why?: string; room?: string; code?: string; config?: Record<string, unknown>; amount?: number }) {
+  private receive(m: { t: string; seed?: number; side?: number; delay?: number; k?: number; b?: number[]; why?: string; room?: string; code?: string; config?: Record<string, unknown>; amount?: number; voice?: { iceServers: RTCIceServer[]; initiator: boolean } | null; d?: unknown }) {
     if (m.t === 'wait') this.status = 'waiting';
     else if (m.t === 'room') { this.status = 'room'; this.room = String(m.code ?? ''); }
     else if (m.t === 'start') {
       this.seed = m.seed! >>> 0; this.side = m.side === 1 ? 1 : 0; this.delay = m.delay! | 0;
       this.status = 'playing';
       this.config = m.config && typeof m.config === 'object' ? m.config : {};
+      this.voice = m.voice && Array.isArray(m.voice.iceServers) ? m.voice : null;
       for (let k = 0; k < this.delay; k++) this.input(k, 0);
       this.onStart();
     } else if (m.t === 'f' && Number.isInteger(m.k)) this.frames.set(m.k!, [m.b![0] & 0xffffff, m.b![1] & 0xffffff]); // controls + commands
     else if (m.t === 'reward') this.reward = Number(m.amount) || 0;
+    else if (m.t === 'rtc' && m.d && typeof m.d === 'object') this.onSignal(m.d);
     else if (m.t === 'bye') { this.message = t(BYE[m.why ?? ''] ?? BYE.unknown, String(m.room ?? '')); this.status = 'closed'; }
   }
 
@@ -47,6 +51,7 @@ export class Net {
   }
 
   input(k: number, bits: number) { this.send({ t: 'in', k, b: bits }); }
+  signal(d: object) { this.send({ t: 'rtc', d }); }
 
   /** Lets the server detect diverged simulations. */
   check(k: number, s: State) {

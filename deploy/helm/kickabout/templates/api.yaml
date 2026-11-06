@@ -58,6 +58,12 @@ spec:
             - { name: PUBLIC_URL, value: {{ .Values.publicUrl | quote }} }
             - { name: API_URL, value: {{ .Values.apiUrl | quote }} }
             - { name: COOKIE_DOMAIN, value: {{ .Values.cookieDomain | quote }} }
+            - { name: STUN_URLS, value: {{ join "," .Values.voice.stun | quote }} }
+            {{- if .Values.turn.enabled }}
+            - { name: TURN_URLS, value: {{ join "," .Values.turn.urls | quote }} }
+            - name: TURN_SECRET
+              valueFrom: { secretKeyRef: { name: {{ .Release.Name }}-turn, key: TURN_SECRET } }
+            {{- end }}
             - { name: DEV_LOGIN, value: {{ ternary "1" "0" .Values.api.devLogin | quote }} }
           envFrom: [{ secretRef: { name: {{ include "kickabout.oauthSecret" . }} } }]
           volumeMounts: [{ name: data, mountPath: /data }]

@@ -15,3 +15,9 @@ ingress:
   annotations: # this Traefik redirects HTTP to HTTPS: serve on websecure with its default certificate
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
+# Voice chat relay on this machine (the emulators sit behind separate NATs and need it).
+turn:
+  enabled: true
+  externalIp: 172.16.0.10
+  secret: local-turn-secret
+  urls: ["turn:172.16.0.10:3478?transport=udp", "turn:172.16.0.10:3478?transport=tcp"]

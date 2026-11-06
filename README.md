@@ -137,6 +137,19 @@ Potem jedna z opcji:
 
 Murawę i zasady ustala założyciel pokoju (w szybkiej grze: gracz, który czekał pierwszy). Długość meczu proponują obaj gracze: gdy się różnią, serwer losuje jedną z dwóch. Opóźnienie sterowania wynosi 100 ms.
 
+### Czat głosowy
+
+- **Gdzie:** tylko w prywatnym pokoju (ze znajomym z kodem) i tylko wtedy, gdy obaj gracze włączą „Czat głosowy”. W szybkiej grze z przypadkowym rywalem go nie ma.
+- **Jak działa:** WebRTC (kodek Opus z tłumieniem echa i szumu). Dźwięk płynie bezpośrednio między telefonami, a serwer gry tylko przekazuje sygnalizację (`server/voice.ts`, `src/voice.ts`).
+- **Wpływ na mecz:** żaden. Głos ma osobne połączenie, a symulacja o nim nie wie.
+- **W meczu:** przycisk mikrofonu obok pauzy wycisza Twój mikrofon. Kropka przy nim pokazuje stan połączenia. W pauzie można wyciszyć przeciwnika. Szum trybun cichnie na czas rozmowy.
+- **Bez mikrofonu** (brak zgody) nadal słyszysz przeciwnika.
+- **Serwery ICE:**
+  - `STUN_URLS` (domyślnie STUN Google);
+  - opcjonalny przekaźnik TURN (coturn) dla sieci, w których telefony nie połączą się bezpośrednio: `TURN_URLS` i `TURN_SECRET`. Dane dostępowe dla klientów są ważne godzinę (`use-auth-secret`).
+  - W Helm: `turn.enabled`, `turn.externalIp`, `turn.secret`, `turn.urls`. Coturn działa na sieci węzła (UDP 3478 i porty 49160–49200).
+- **Strona i przeglądarka:** mikrofon działa tylko na https (albo `localhost`, czyli w aplikacji).
+
 ## Wdrożenie
 
 **Docker Compose:** `docker compose up --build` uruchamia oba obrazy. Dane OAuth wpisz do `.env` (zmienne z tabeli wyżej). Lokalnie domyślnie działa `DEV_LOGIN=1`.

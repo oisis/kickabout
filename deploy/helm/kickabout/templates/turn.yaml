@@ -1,0 +1,54 @@
+{{- if .Values.turn.enabled }}
+{{- /* coturn relay for the voice chat when phones cannot reach each other directly. It needs UDP
+       3478 and the relay port range on the node itself, hence hostNetwork. */}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-turn
+  labels: {{- include "kickabout.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  TURN_SECRET: {{ required "turn.secret is required when turn.enabled" .Values.turn.secret | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-turn
+  labels: {{- include "kickabout.labels" . | nindent 4 }}
+    app.kubernetes.io/component: turn
+spec:
+  replicas: 1
+  strategy: { type: Recreate } # host ports
+  selector:
+    matchLabels: {{- include "kickabout.selector" (dict "root" . "component" "turn") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "kickabout.labels" . | nindent 8 }}
+        app.kubernetes.io/component: turn
+      annotations:
+        checksum/secret: {{ .Values.turn.secret | sha256sum }}
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: coturn
+          image: {{ .Values.turn.image | quote }}
+          args:
+            - -n
+            - --log-file=stdout
+            - --listening-port={{ .Values.turn.port }}
+            - --min-port={{ .Values.turn.minPort }}
+            - --max-port={{ .Values.turn.maxPort }}
+            - --external-ip={{ required "turn.externalIp is required when turn.enabled" .Values.turn.externalIp }}
+            - --realm=kickabout
+            - --use-auth-secret
+            - --static-auth-secret=$(TURN_SECRET)
+            - --fingerprint
+            - --no-cli
+            - --no-tls
+            - --no-dtls
+            - --no-multicast-peers
+            - --denied-peer-ip=0.0.0.0-0.255.255.255
+          envFrom: [{ secretRef: { name: {{ .Release.Name }}-turn } }]
+          resources: {{- toYaml .Values.turn.resources | nindent 12 }}
+{{- end }}

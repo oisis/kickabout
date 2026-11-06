@@ -277,13 +277,14 @@ async function league(d: Device) {
   await d.tap('Menu').catch(() => {});
 }
 
-async function goOnline(d: Device, mode: 'quick' | 'host' | 'join', teamName: string, code = '', extra = false, club = false) {
+async function goOnline(d: Device, mode: 'quick' | 'host' | 'join', teamName: string, code = '', extra = false, club = false, voice = false) {
   for (let i = 0; i < 3 && !(await d.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await d.tap('← Wstecz').catch(() => d.tap('Menu'));
   await d.tap('Gra online');
   await d.type('Adres serwera', SERVER);
   await d.choose('Twoja drużyna', teamName, true);
   await d.choose('Tryb', d.t({ quick: 'Szybka gra — losowy przeciwnik', host: 'Załóż pokój dla znajomego', join: 'Dołącz do pokoju znajomego' }[mode]), true);
   await d.toggle('Zagraj moim klubem online (nagrody, wymaga konta)', club);
+  if (mode !== 'quick') await d.toggle('Czat głosowy (gdy znajomy też go włączy)', voice);
   if (mode === 'join') await d.type('Kod pokoju', code.toLowerCase()); // typed lowercase, the field uppercases
   else { await d.choose('Murawa', d.t('Losowa'), true); await d.toggle('Dogrywka przy remisie', extra); await d.toggle('Rzuty karne przy remisie', extra); }
   d.snap(`online-${mode}`);
@@ -409,6 +410,44 @@ async function clubPhase(A: Device, B: Device) {
   check('9: both owners got prize money from the server', rewards.every((r) => r > 0), rewards.join(', '));
 }
 
+// ---------- voice chat (private room, WebRTC through the TURN relay) ----------
+
+/** The emulators have no audio device: a tone generator stands in for the microphone. */
+const fakeMic = (d: Device, hz: number) => d.js(`navigator.mediaDevices.getUserMedia = async () => {
+  const ac = new AudioContext(), o = ac.createOscillator(), out = ac.createMediaStreamDestination();
+  o.frequency.value = ${hz}; o.connect(out); o.start(); return out.stream; }`);
+
+async function voicePhase(A: Device, B: Device) {
+  log('10. Czat głosowy w prywatnym pokoju');
+  for (const d of [A, B]) for (let i = 0; i < 3 && !(await d.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await d.tap('← Wstecz').catch(() => {});
+  await fakeMic(A, 440); await fakeMic(B, 660);
+  await goOnline(A, 'host', 'London Navigators', '', false, false, true);
+  await waitFor('10: room created', 15_000, async () => (await A.state()).status === 'room');
+  await goOnline(B, 'join', 'Leeds Sentinels', (await A.state()).room, false, false, true);
+  await waitFor('10: match starts', 20_000, async () => (await A.state()).status === 'playing' && (await B.state()).status === 'playing');
+  const stopA = startPlaying(A), stopB = startPlaying(B);
+  const connected = await waitFor('10: voice connected on both phones', 30_000, async () =>
+    (await A.js<string>(`kickabout.app.voice?.state`)) === 'connected' && (await B.js<string>(`kickabout.app.voice?.state`)) === 'connected');
+  if (connected) check('10: voice connected on both phones', true);
+  const f0 = (await A.state()).tick;
+  await sleep(10_000);
+  const f1 = (await A.state()).tick;
+  const bytes = [await A.js<number>(`kickabout.app.voice.received()`), await B.js<number>(`kickabout.app.voice.received()`)];
+  check('10: each phone hears the other', bytes.every((n) => n > 1000), bytes.join(' / ') + ' bytes');
+  check('10: the match keeps its pace during the call', f1 - f0 > 450, `${f1 - f0} ticks in 10 s`);
+  const pair = await A.js<string>(`(async () => { let s = ''; (await kickabout.app.voice.pc.getStats()).forEach((r) => { if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded') s = r.localCandidateId; }); const st = await kickabout.app.voice.pc.getStats(); return st.get(s)?.candidateType ?? '?'; })()`);
+  log(`   ścieżka głosu na A: ${pair}`);
+  A.snap('glos'); B.snap('glos');
+  stopA(); stopB(); await sleep(800);
+  await A.tapAt(411 - 112, 44); await sleep(400); // the microphone button next to pause
+  check('10: mic button mutes', await A.js<boolean>(`kickabout.app.voice.muted`));
+  A.snap('glos-wyciszony');
+  await A.tapAt(411 - 44, 44); await sleep(800); // pause → leave the match ends the call
+  await A.js(`window.confirm = () => true`);
+  await A.tap('Wyjdź z meczu'); await sleep(1500);
+  check('10: leaving the match ends the call', await A.js<boolean>(`kickabout.app.voice === null`));
+}
+
 async function main() {
   execFileSync('mkdir', ['-p', SHOTS]);
   const A = new Device('A', SERIAL_A, 9401), B = new Device('B', SERIAL_B, 9402);
@@ -417,7 +456,8 @@ async function main() {
   const phases = (process.env.PHASES ?? 'basic,club').split(',');
   if (!phases.includes('basic')) {
     await Promise.all([setOptions(A, 'pl', '5 min', false), setOptions(B, 'en', '5 min', false)]);
-    await clubPhase(A, B);
+    if (phases.includes('club')) await clubPhase(A, B);
+    if (phases.includes('voice')) await voicePhase(A, B);
     return finish();
   }
 
