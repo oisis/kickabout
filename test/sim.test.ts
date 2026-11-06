@@ -114,3 +114,17 @@ test('aftertouch: holding sideways after a kick curves the ball, pulling back li
   assert.ok(right.x > straight.x + M, `right ${right.x} vs ${straight.x}`);
   assert.ok(back.maxZ > straight.maxZ, `lift ${back.maxZ} vs ${straight.maxZ}`);
 });
+
+test('a ball kicked into touch rolls over the line, then is placed on it for the throw-in', () => {
+  const s = newMatch(1, setup());
+  while (s.phase !== 'play') step(s, [0, 0]);
+  Object.assign(s.ball, { x: W - 100, y: 50 * M, z: 0, vx: 150, vy: 0, vz: 0 });
+  s.ownerTeam = s.ownerIdx = -1; s.lastTouch = 0;
+  step(s, [0, 0]);
+  assert.equal(s.phase, 'out');
+  assert.equal(s.restart!.type, 'throw');
+  for (let i = 0; i < 10; i++) step(s, [0, 0]);
+  assert.ok(s.ball.x > W + M, `still rolling beyond the touchline: ${s.ball.x - W}`);
+  while (s.phase === 'out' && s.ball.x !== W) step(s, [0, 0]);
+  assert.deepEqual([s.ball.x, s.ball.vx, s.phase], [W, 0, 'out']); // on the line, waiting for the taker
+});

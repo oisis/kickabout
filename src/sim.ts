@@ -292,6 +292,9 @@ function movePlayers(s: State) {
 function deadBall(s: State) {
   s.hold = [0, 0];
   if (--s.timer > 0) {
+    // After the ball crosses a line it keeps rolling for OUT_ROLL frames before it is placed for the restart.
+    if (s.phase === 'out' && s.timer > 60) freeBall(s);
+    if (s.phase === 'out' && s.timer === 60) placeBall(s, s.restart!.x, s.restart!.y);
     if (s.phase === 'goal') {
       freeBall(s);
       const b = s.ball;
@@ -728,10 +731,14 @@ function header(s: State) {
   s.lastTouch = bt; s.lastIdx = bi; p.cool = 14;
 }
 
+const OUT_ROLL = 30;
+
 function out(s: State, team: number, type: RestartType, x: number, y: number, label: EventCode, idx = -1) {
   if (idx < 0) idx = nearestOutfield(s, team, x, y, -1);
-  s.phase = 'out'; s.timer = type === 'penalty' ? 90 : 60; s.restart = { type, team, idx, x, y };
-  placeBall(s, x, y);
+  const crossed = type === 'throw' || type === 'corner' || type === 'goalkick';
+  s.phase = 'out'; s.timer = type === 'penalty' ? 90 : crossed ? 60 + OUT_ROLL : 60; s.restart = { type, team, idx, x, y };
+  if (crossed) { s.ownerTeam = s.ownerIdx = -1; s.after = null; } // ball rolls on over the line first (see deadBall)
+  else placeBall(s, x, y);
   say(s, label);
 }
 
