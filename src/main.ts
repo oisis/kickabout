@@ -1,6 +1,6 @@
 import { step, TICK_HZ, type State } from './sim.ts';
 import { Controls } from './input.ts';
-import { render } from './render.ts';
+import { render, setZoom } from './render.ts';
 import { MatchRun, type MatchSpec } from './match.ts';
 import { type Highlight, addHighlights, options } from './store.ts';
 import { show, toast } from './ui.ts';
@@ -39,6 +39,7 @@ export class App {
     const o = options();
     audio.sound = o.sound;
     audio.music = o.music;
+    setZoom(o.zoom);
   }
 
   menu() {

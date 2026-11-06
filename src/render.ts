@@ -15,10 +15,16 @@ const GRASS = [['#a7c4c9', '#b7d2d6'], ['#5b6b2f', '#66763a'], ['#256f33', '#2b7
 const MARK = ['#facc15', '#22d3ee'];
 const cam = { x: W / 2, y: H / 2 };
 
+/** Metres of pitch shown top to bottom [portrait, landscape] per camera option: far, normal, close. */
+export const ZOOM = [[44, 24], [36, 21], [30, 18]];
+let zoom = 1;
+export const setZoom = (z: number) => { zoom = ZOOM[z] ? z : 1; };
+
 export function render(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, c: Controls, view: View) {
   const cw = ctx.canvas.width, ch = ctx.canvas.height, dpr = devicePixelRatio || 1;
-  // px per unit: portrait shows 44 m of pitch top to bottom; landscape fits ~24 m vertically (and most of the width).
-  const k = cw > ch ? ch / (24 * M) : ch / (44 * M);
+  // px per unit. Players are true to the pitch (about 2 m tall on a 68 × 105 m pitch); the camera decides how big they look.
+  const [portrait, landscape] = ZOOM[zoom];
+  const k = cw > ch ? ch / (landscape * M) : ch / (portrait * M);
   const b = s.ball;
   cam.x += (b.x - cam.x) * 0.12;
   cam.y += (b.y - b.z - cam.y) * 0.12;
@@ -216,6 +222,31 @@ function head(ctx: CanvasRenderingContext2D, x: number, y: number, fx: number, f
   ctx.beginPath(); ctx.ellipse(x, y, r, r * 1.05, 0, 0, Math.PI * 2); ctx.stroke();
 }
 
+/**
+ * A slide tackle on the hip, seen from above-front: the lead leg straight at the ball, the other bent
+ * underneath, the body leaning back and raised (height goes up the screen, whatever the direction),
+ * one hand on the ground and the other arm up behind for balance.
+ */
+function sliding(ctx: CanvasRenderingContext2D, p: Player, shirt: string, shorts: string, team: number) {
+  const len = Math.hypot(p.fx, p.fy) || 1, dx = p.fx / len, dy = p.fy / len;
+  const at = (a: number, h: number, side = 0): [number, number] => [p.x + (dx * a - dy * side) * M, p.y + (dy * a + dx * side - h) * M];
+  const seg = (a: [number, number], b: [number, number], w: number, c: string) => { ctx.strokeStyle = c; ctx.lineWidth = w * M; line(ctx, a[0], a[1], b[0], b[1]); };
+  ctx.lineCap = 'round';
+  const hip = at(0, 0.22), shoulder = at(-0.48, 0.42 - Math.abs(dy) * 0.12);
+  seg(shoulder, at(-0.6, 0.02, 0.2), 0.11, SKIN); // hand on the ground
+  const knee = at(0.32, 0.2, -0.16);
+  seg(hip, knee, 0.16, '#1f2937'); seg(knee, at(0.12, 0.04, -0.22), 0.15, '#1f2937'); // bent leg underneath
+  const foot = at(0.98, 0.1);
+  seg(hip, foot, 0.17, '#1f2937'); // lead leg, studs first
+  ellipse(ctx, foot[0], foot[1], 0.1 * M, 0.08 * M, '#111');
+  ellipse(ctx, hip[0], hip[1], 0.2 * M, 0.17 * M, shorts);
+  seg(hip, shoulder, 0.44, 'rgba(0,0,0,0.45)'); seg(hip, shoulder, 0.38, shirt); // torso
+  seg(shoulder, at(-0.78, 0.72, -0.16), 0.11, SKIN); // other arm up for balance
+  ctx.lineCap = 'butt';
+  const [hx, hy] = at(-0.6, 0.72 - Math.abs(dy) * 0.12);
+  head(ctx, hx, hy, dx, dy, p.n * 7 + team * 5, 0.11 * M);
+}
+
 /** Squad number on the shirt, dark or light depending on the shirt colour. */
 function shirtNumber(ctx: CanvasRenderingContext2D, n: number, x: number, y: number, shirt: string) {
   const c = parseInt(shirt.slice(1), 16), light = ((c >> 16) * 299 + ((c >> 8) & 255) * 587 + (c & 255) * 114) / 1000 > 150;
@@ -231,6 +262,7 @@ function shirtNumber(ctx: CanvasRenderingContext2D, n: number, x: number, y: num
  * first (legs towards the ball, head behind) until they are back up; a fouled player lies head first.
  */
 function lying(ctx: CanvasRenderingContext2D, p: Player, shirt: string, shorts: string, feetFirst: boolean, team: number) {
+  if (feetFirst) return sliding(ctx, p, shirt, shorts, team);
   ctx.save();
   ctx.translate(p.x, p.y - 0.3 * M);
   ctx.rotate(Math.atan2(p.fy, p.fx) + (feetFirst ? 0 : Math.PI));

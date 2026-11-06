@@ -86,6 +86,7 @@ export function optionsScreen(app: App) {
     toggle(tr('Dogrywka przy remisie'), o.extraTime, set('extraTime')),
     toggle(tr('Rzuty karne przy remisie'), o.penalties, set('penalties')),
     select(tr('Murawa (domyślna)'), o.pitch, pitchOptions(), set('pitch')),
+    select(tr('Kamera'), o.zoom, [[0, tr('Daleko — widać więcej boiska')], [1, tr('Normalnie')], [2, tr('Blisko — więksi zawodnicy')]], set('zoom')),
     toggle(tr('Automatyczne powtórki goli'), o.autoReplay, set('autoReplay')),
     toggle(tr('Zapisuj najlepsze momenty'), o.autoSaveHighlights, set('autoSaveHighlights')),
     toggle(tr('Dźwięk'), o.sound, set('sound')),

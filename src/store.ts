@@ -11,6 +11,7 @@ export interface Options {
   pitch: number; // 0..6, 7 = random, 8 = seasonal
   autoReplay: boolean;
   autoSaveHighlights: boolean;
+  zoom: number; // camera: 0 far, 1 normal, 2 close (see render.ts ZOOM)
   sound: boolean;
   music: boolean;
 }
@@ -20,7 +21,7 @@ export const MATCH_MINUTES = [5, 10, 15, 20];
 export const matchMinutes = (m: unknown): number => MATCH_MINUTES.find((x) => x >= (Number(m) || 0)) ?? MATCH_MINUTES[MATCH_MINUTES.length - 1];
 export const minuteOptions = (): [number, string][] => MATCH_MINUTES.map((m) => [m, `${m} min`]);
 
-export const DEFAULT_OPTIONS: Options = { minutes: 5, extraTime: false, penalties: false, pitch: 4, autoReplay: true, autoSaveHighlights: true, sound: true, music: true };
+export const DEFAULT_OPTIONS: Options = { minutes: 5, extraTime: false, penalties: false, pitch: 4, autoReplay: true, autoSaveHighlights: true, zoom: 1, sound: true, music: true };
 
 /** What a renderer needs to show a match: names and kits (kept beside, not inside, the sim state). */
 export interface MatchInfo { names: string[]; shorts: string[]; kits: Kit[]; keepers: string[]; players: string[][]; sponsors?: string[][] }
