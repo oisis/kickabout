@@ -75,6 +75,7 @@ function openDb(path: string) {
     CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE, created INTEGER NOT NULL, expires INTEGER NOT NULL, agent TEXT NOT NULL DEFAULT '');
     CREATE TABLE IF NOT EXISTS app_codes (code TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE, expires INTEGER NOT NULL);`);
   try { db.exec('ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0'); } catch { /* already there */ }
+  try { db.exec('ALTER TABLE users ADD COLUMN seen INTEGER NOT NULL DEFAULT 0'); } catch { /* already there */ }
   return db;
 }
 
@@ -106,6 +107,7 @@ export function accounts(opts: AccountOptions = {}, routes: Route[] = []) {
     addIdentity: db.prepare('INSERT INTO identities (provider, subject, user_id, email, created) VALUES (?, ?, ?, ?, ?)'),
     addUser: db.prepare('INSERT INTO users (name, email, avatar, created) VALUES (?, ?, ?, ?)'),
     banned: db.prepare('SELECT banned FROM users WHERE id = ?'),
+    seen: db.prepare('UPDATE users SET seen = ? WHERE id = ? AND seen < ?'), // last activity, at most one write an hour
     // a user an administrator added by e-mail, waiting for their first sign-in
     invited: db.prepare('SELECT id FROM users u WHERE lower(email) = lower(?) AND NOT EXISTS (SELECT 1 FROM identities i WHERE i.user_id = u.id)'),
     // a banned person may not come back with another provider under the same e-mail
@@ -124,6 +126,7 @@ export function accounts(opts: AccountOptions = {}, routes: Route[] = []) {
   function newToken(userId: number, agent: string) {
     const token = randomBytes(32).toString('base64url'), now = Date.now();
     q.addSession.run(sha(token), userId, now, now + SESSION_DAYS * 864e5, agent.slice(0, 200));
+    q.seen.run(now, userId, now); // signing in is activity too
     return token;
   }
   const newSession = (userId: number, agent: string) => cookie('sid', newToken(userId, agent), SESSION_DAYS * 86400);
@@ -133,7 +136,8 @@ export function accounts(opts: AccountOptions = {}, routes: Route[] = []) {
     const bearer = /^Bearer (\S+)$/.exec(req.headers.authorization ?? '')?.[1] ?? token;
     const raw = bearer ?? cookies(req).sid;
     if (!raw) return null;
-    const row = q.session.get(sha(raw), Date.now()) as { user_id: number } | undefined;
+    const now = Date.now(), row = q.session.get(sha(raw), now) as { user_id: number } | undefined;
+    if (row) q.seen.run(now, row.user_id, now - 3600_000);
     return row ? { id: row.user_id, hash: sha(raw), via: bearer ? 'bearer' : 'cookie' } : null;
   }
   /** Finds or creates the user behind an external identity; links it to `linkTo` when given. */

@@ -66,6 +66,10 @@ spec:
             {{- end }}
             - { name: DEV_LOGIN, value: {{ ternary "1" "0" .Values.api.devLogin | quote }} }
             - { name: ADMIN_EMAILS, value: {{ join "," .Values.api.adminEmails | quote }} }
+            {{- if .Values.metrics.token }}
+            - name: METRICS_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ .Release.Name }}-metrics, key: token } }
+            {{- end }}
           envFrom: [{ secretRef: { name: {{ include "kickabout.oauthSecret" . }} } }]
           volumeMounts: [{ name: data, mountPath: /data }]
           readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 10 }
@@ -80,7 +84,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Release.Name }}-api
-  labels: {{- include "kickabout.labels" . | nindent 4 }}
+  labels:
+    {{- include "kickabout.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+  {{- if .Values.metrics.annotations }}
+  annotations: { prometheus.io/scrape: "true", prometheus.io/port: "8787", prometheus.io/path: /metrics }
+  {{- end }}
 spec:
   selector: {{- include "kickabout.selector" $sel | nindent 4 }}
   ports: [{ name: http, port: 8787, targetPort: http }]

@@ -1,0 +1,28 @@
+{{- if .Values.metrics.token }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-metrics
+  labels: {{- include "kickabout.labels" . | nindent 4 }}
+type: Opaque
+stringData: { token: {{ .Values.metrics.token | quote }} }
+---
+{{- end }}
+{{- if .Values.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-api
+  labels:
+    {{- include "kickabout.labels" . | nindent 4 }}
+    {{- with .Values.metrics.serviceMonitor.labels }}{{ toYaml . | nindent 4 }}{{ end }}
+spec:
+  selector: { matchLabels: { app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: api } }
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+      {{- if .Values.metrics.token }}
+      authorization: { type: Bearer, credentials: { name: {{ .Release.Name }}-metrics, key: token } }
+      {{- end }}
+{{- end }}

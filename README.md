@@ -209,6 +209,42 @@ helm upgrade --install kickabout deploy/helm/kickabout -n kickabout --create-nam
 
 Strona: `https://kickabout.localhost` (Traefik, certyfikat domyślny) oraz `http://172.16.0.10:30080` dla telefonów w sieci lokalnej.
 
+### Metryki (Prometheus)
+
+API wystawia `GET /metrics` na porcie 8787 w formacie tekstowym Prometheusa. Ścieżka jest celowo poza `/api`, więc strona jej nie przepuszcza. Przy publicznej subdomenie API ustaw token (`METRICS_TOKEN`, w Helmie `metrics.token`), a Prometheus wyśle go jako `Authorization: Bearer …`.
+
+W Helmie usługa API ma adnotacje `prometheus.io/scrape|port|path` (`metrics.annotations`). Dla Prometheus Operatora / kube-prometheus-stack:
+
+```yaml
+metrics:
+  serviceMonitor:
+    enabled: true
+    labels: { release: kube-prometheus-stack }   # selektor Twojego Prometheusa
+```
+
+| Metryka | Co mierzy |
+|---|---|
+| `kickabout_online{activity="playing\|waiting\|watching"}` | grający, czekający na mecz i kibice w tej chwili |
+| `kickabout_live_matches` | mecze online w toku |
+| `kickabout_users`, `kickabout_users_banned`, `kickabout_users_invited` | konta, zablokowane, dodane przez admina bez logowania |
+| `kickabout_users_active{period="1d\|7d\|30d"}` | konta aktywne (strona, aplikacja, klub) w okresie |
+| `kickabout_users_registered{period=…}` | nowe konta w okresie |
+| `kickabout_identities{provider}`, `kickabout_sessions` | metody logowania wg dostawcy, ważne sesje |
+| `kickabout_clubs_owned{origin="founded\|bought"}`, `kickabout_clubs_active{period=…}` | kluby graczy |
+| `kickabout_coins`, `kickabout_ledger_coins{kind}`, `kickabout_ledger_entries{kind}` | monety w portfelach, przepływy wg rodzaju (nagrody, transfery, stroje, sponsoring) |
+| `kickabout_offers{status}`, `kickabout_sponsor_coins`, `kickabout_cpu_matches{state}` | oferty między graczami, sponsoring, mecze o nagrodę z komputerem |
+| `kickabout_matches_started_total{kind}`, `kickabout_matches_finished_total{kind,result}` | mecze online: szybkie, w pokoju, klubowe; zakończone normalnie lub przez wyjście gracza |
+| `kickabout_goals_total`, `kickabout_voice_calls_total`, `kickabout_connections_total`, `kickabout_watch_requests_total{result}` | gole, rozmowy głosowe, połączenia WebSocket, wejścia do strefy kibica |
+| `kickabout_info{version}`, `process_*`, `nodejs_heap_used_bytes` | wersja, pamięć, CPU, czas startu |
+
+Metryki z bazy liczy się przy każdym pobraniu. Liczniki `*_total` żyją w pamięci i po restarcie zaczynają od zera, co `rate()` i `increase()` obsługują.
+
+Przykłady do dashboardu:
+- `sum(kickabout_online)`: osób online;
+- `sum by (kind) (increase(kickabout_matches_started_total[1d]))`: mecze dziennie wg rodzaju;
+- `kickabout_users_active{period="7d"}`: aktywni w tygodniu;
+- `sum(increase(kickabout_matches_finished_total{result="player-left"}[1d])) / sum(increase(kickabout_matches_finished_total[1d]))`: odsetek przerwanych meczów.
+
 ## Wersje
 
 Wersjonowanie semantyczne. Jedynym źródłem wersji jest `package.json`. Z niej korzystają:

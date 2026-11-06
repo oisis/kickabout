@@ -11,6 +11,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import type { IncomingMessage } from 'node:http';
 import { accounts, envProviders, type AccountOptions, type Route } from './accounts.ts';
 import { admin, type Online } from './admin.ts';
+import { metrics, Counters } from './metrics.ts';
 import { iceServers, voiceFromEnv, MAX_SIGNAL, MAX_SIGNALS, type VoiceOptions } from './voice.ts';
 import { clubs } from './clubs.ts';
 import { live, type LiveMatch } from './live.ts';
@@ -33,23 +34,38 @@ interface Match {
   live: LiveMatch | null;
   /** Voice chat: both players of a private room switched it on; signalling messages relayed so far. */
   voice: boolean; signals: number;
+  kind: 'quick' | 'room' | 'club';
 }
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a);
 const send = (ws: WebSocket, msg: object) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); };
 const isTick = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 
-export function startServer(port: number, opts: AccountOptions & { voice?: VoiceOptions } = {}): Server {
+export function startServer(port: number, opts: AccountOptions & { voice?: VoiceOptions; metricsToken?: string } = {}): Server {
   let club!: ReturnType<typeof clubs>, adm!: Route;
   const api = accounts(opts, [(c) => club.route(c), (c) => adm(c)]);
   club = clubs(api.db);
   adm = admin(api.db, api.isAdmin, () => onlineNow());
+  const counters = new Counters();
+  counters.define('matches_started', 'Online matches started, by kind.');
+  counters.define('matches_finished', 'Online matches over, by kind and how they ended (full time or a player left).');
+  counters.define('goals', 'Goals in finished online matches.');
+  counters.define('voice_calls', 'Online matches with voice chat.');
+  counters.define('connections', 'WebSocket connections opened (players and fans).');
+  counters.define('watch_requests', 'Fan zone requests to watch a match, by outcome.');
+  const scrape = metrics(api.db, () => onlineNow(), counters, VERSION);
   club.sweep();
   const sweeper = setInterval(() => club.sweep(), 3600_000);
   sweeper.unref();
   const http = createServer(async (req, res) => {
     if (req.url === '/healthz') { res.writeHead(200).end('ok'); return; }
     if (req.url === '/live' || req.url === '/api/live') { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'access-control-allow-origin': '*' }).end(JSON.stringify(fans.list())); return; }
+    // Not under /api: the website's proxy does not expose it; a token guards an API subdomain.
+    if (req.url === '/metrics') {
+      if (opts.metricsToken && req.headers.authorization !== `Bearer ${opts.metricsToken}`) { res.writeHead(401).end(); return; }
+      res.writeHead(200, { 'content-type': 'text/plain; version=0.0.4; charset=utf-8', 'cache-control': 'no-store' }).end(scrape());
+      return;
+    }
     if (req.url === '/online' || req.url === '/api/online') { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'access-control-allow-origin': '*' }).end(JSON.stringify(onlineNow())); return; }
     if (req.url === '/version' || req.url === '/api/version') { res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }).end(JSON.stringify({ version: VERSION })); return; }
     if (!(await api.handle(req, res))) res.writeHead(404, { 'content-type': 'text/plain' }).end('Kickabout API');
@@ -74,6 +90,10 @@ export function startServer(port: number, opts: AccountOptions & { voice?: Voice
   function end(m: Match, why: string) {
     log('koniec meczu:', why);
     fans.end(m.live, m.sim.phase === 'end' ? 'end' : why === 'opponent-left' ? 'player-left' : why);
+    if (matches.has(m.players[0]) || matches.has(m.players[1])) { // once per match
+      counters.inc('matches_finished', { kind: m.kind, result: m.sim.phase === 'end' ? 'full-time' : why === 'opponent-left' ? 'player-left' : why });
+      if (m.sim.phase === 'end') counters.inc('goals', {}, m.sim.score[0] + m.sim.score[1]);
+    }
     for (const p of m.players) { matches.delete(p); send(p, { t: 'bye', why }); p.close(); }
   }
 
@@ -92,10 +112,13 @@ export function startServer(port: number, opts: AccountOptions & { voice?: Voice
     const m: Match = {
       players: [a, b], inputs: [new Map(), new Map()], next: 0, hashes: new Map(), users: [host.user, guest.user],
       ratings: rewarded ? [club.rating(home), club.rating(away)] : [0, 0], sim: newMatch(seed, setup), note: `${home.short} – ${away.short}`, rewarded, voice, signals: 0, live: null,
+      kind: rewarded ? 'club' : room ? 'room' : 'quick',
     };
+    counters.inc('matches_started', { kind: m.kind });
+    if (voice) counters.inc('voice_calls');
     // Fan zone: quick matches are public unless a player opts out; a private room only if its host allows it.
     const visible = (room ? host.config.spectate === true : true) && host.config.hidden !== true && guest.config.hidden !== true;
-    m.live = fans.add(rewarded ? 'club' : room ? 'room' : 'quick', config, m.sim, visible);
+    m.live = fans.add(m.kind, config, m.sim, visible);
     const ice = voice ? iceServers(opts.voice) : [];
     m.players.forEach((p, side) => {
       matches.set(p, m); lobbyOf.delete(p);
@@ -178,6 +201,7 @@ export function startServer(port: number, opts: AccountOptions & { voice?: Voice
   http.on('close', () => clearInterval(heartbeat));
   wss.on('connection', (ws, req) => {
     alive.add(ws);
+    counters.inc('connections');
     ws.on('pong', () => alive.add(ws));
     reqOf.set(ws, req); // cookies of the upgrade request identify players of the browser game
     ws.on('message', (data) => {
@@ -186,7 +210,7 @@ export function startServer(port: number, opts: AccountOptions & { voice?: Voice
       const m = matches.get(ws);
       if (m) onMessage(ws, m, msg);
       else if (msg.t === 'join' && !lobbyOf.has(ws) && waiting?.ws !== ws) enterLobby(ws, msg);
-      else if (msg.t === 'watch') fans.watch(ws, msg.id);
+      else if (msg.t === 'watch') counters.inc('watch_requests', { result: fans.watch(ws, msg.id) ? 'ok' : 'refused' });
     });
     ws.on('close', () => {
       reqOf.delete(ws);
@@ -208,7 +232,7 @@ if (import.meta.main) {
   const providers = envProviders();
   startServer(port, {
     db: env.DB_PATH ?? 'kickabout.db', publicUrl: env.PUBLIC_URL ?? `http://localhost:${port}`, apiUrl: env.API_URL || undefined,
-    cookieDomain: env.COOKIE_DOMAIN || undefined, providers, admins: (env.ADMIN_EMAILS ?? '').split(','), devLogin: env.DEV_LOGIN === '1', voice: voiceFromEnv(),
+    cookieDomain: env.COOKIE_DOMAIN || undefined, providers, admins: (env.ADMIN_EMAILS ?? '').split(','), metricsToken: env.METRICS_TOKEN || undefined, devLogin: env.DEV_LOGIN === '1', voice: voiceFromEnv(),
   }).on('listening', () => {
     const ips = Object.values(networkInterfaces()).flat().filter((i) => i?.family === 'IPv4' && !i.internal).map((i) => i!.address);
     log(`Kickabout API ${VERSION} na porcie ${port}; logowanie: ${[...Object.keys(providers), ...(env.DEV_LOGIN === '1' ? ['dev'] : [])].join(', ') || 'wyłączone'}.`);

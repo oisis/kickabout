@@ -58,6 +58,16 @@ turn:
     requests: { cpu: 20m, memory: 32Mi }
     limits: { memory: 128Mi }
 
+# Prometheus: GET /metrics on the API service (port 8787). It is not reachable through the website
+# (only /api and /ws are proxied); with a public API subdomain set a token.
+metrics:
+  token: ""                 # optional Bearer token required by /metrics (stored in a chart Secret)
+  annotations: true         # prometheus.io/scrape|port|path on the API Service (annotation-based discovery)
+  serviceMonitor:           # Prometheus Operator / kube-prometheus-stack
+    enabled: false
+    interval: 30s
+    labels: {}              # e.g. { release: kube-prometheus-stack } to match the operator's selector
+
 ingress:
   enabled: true
   className: nginx
