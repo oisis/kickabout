@@ -102,7 +102,20 @@ export const siteUrl = (): string => (inApp() ? import.meta.env.VITE_SITE ?? '' 
 export function serverUrl(address: string): string {
   const v = address.trim();
   try { localStorage.setItem('server', v); } catch { /* storage unavailable */ }
-  return /^wss?:\/\//.test(v) ? v : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${v}`;
+  return wsUrl(v, location.protocol);
+}
+
+/**
+ * WebSocket URL for what a player typed. A domain name means the Kickabout website: TLS and its
+ * /ws path ("kickabout.example.pl" → wss://kickabout.example.pl/ws). An IP address or localhost
+ * means a server on the LAN, as typed ("192.168.1.10:8787" → ws://192.168.1.10:8787).
+ */
+export function wsUrl(v: string, pageProtocol: string): string {
+  if (/^wss?:\/\//.test(v)) return v;
+  const host = v.split(/[/:]/)[0];
+  const lan = host === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
+  if (lan) return `${pageProtocol === 'https:' ? 'wss' : 'ws'}://${v}`;
+  return `wss://${v.includes('/') ? v : `${v.replace(/\/$/, '')}/ws`}`;
 }
 
 /** The website's own match server (the fan zone ignores an address typed for playing). */

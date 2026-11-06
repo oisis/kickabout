@@ -103,3 +103,12 @@ test('answers health checks and keeps static files to the website', async () => 
   http.closeAllConnections();
   http.close();
 });
+
+test('server addresses: a domain means the website over TLS, an IP a LAN server', async () => {
+  const { wsUrl } = await import('../src/net.ts');
+  assert.equal(wsUrl('kickabout.oisis.pl', 'http:'), 'wss://kickabout.oisis.pl/ws'); // the app (http://localhost) typing the site
+  assert.equal(wsUrl('kickabout.oisis.pl/ws', 'http:'), 'wss://kickabout.oisis.pl/ws');
+  assert.equal(wsUrl('192.168.1.10:8787', 'http:'), 'ws://192.168.1.10:8787');
+  assert.equal(wsUrl('localhost:8787', 'https:'), 'wss://localhost:8787');
+  assert.equal(wsUrl('ws://10.0.2.2:8787', 'http:'), 'ws://10.0.2.2:8787');
+});
