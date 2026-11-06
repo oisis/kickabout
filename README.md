@@ -147,3 +147,7 @@ docker pull ghcr.io/oisis/kickabout-web:latest
 - Identyfikator aplikacji to `com.kickabout.game`. Poprzednia `pl.kopanka.game` to osobna aplikacja: trzeba ją odinstalować.
 - Wersja release jest podpisana kluczem `android/release.jks` (hasło w `android/keystore.properties`, oba poza gitem).
 - **Zrób kopię zapasową klucza**: bez niego nie zainstalujesz aktualizacji na tę samą aplikację.
+
+## Licencja
+
+MIT, zob. `LICENSE`.
