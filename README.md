@@ -4,25 +4,18 @@ Zręcznościowa piłka nożna z widokiem z góry, 11 na 11, na Androida (APK) i 
 
 ## Zrzuty ekranu
 
-Kliknij miniaturę, aby zobaczyć pełny rozmiar.
-
-**Android**
-
-| Menu główne | Mecz | Mój klub online | Rynek transferowy | Mecz klubów online |
-|:---:|:---:|:---:|:---:|:---:|
-| <a href="docs/screenshots/android-1-menu.png"><img src="docs/screenshots/thumbs/android-1-menu.png" alt="Menu główne"></a> | <a href="docs/screenshots/android-2-match.png"><img src="docs/screenshots/thumbs/android-2-match.png" alt="Mecz"></a> | <a href="docs/screenshots/android-3-club.png"><img src="docs/screenshots/thumbs/android-3-club.png" alt="Mój klub online"></a> | <a href="docs/screenshots/android-4-market.png"><img src="docs/screenshots/thumbs/android-4-market.png" alt="Rynek transferowy"></a> | <a href="docs/screenshots/android-5-club-match.png"><img src="docs/screenshots/thumbs/android-5-club-match.png" alt="Mecz klubów online"></a> |
-| logo, wersja | numery, PODANIE i STRZAŁ | monety, ocena, sponsorzy | skład klubu komputera z cenami | sponsor przed meczem |
-
-| Widok poziomy |
-|:---:|
-| <a href="docs/screenshots/android-6-landscape.png"><img src="docs/screenshots/thumbs/android-6-landscape.png" alt="Mecz w poziomie"></a> |
-
-**Strona www**
-
-| Strona główna | Konto | Gra w przeglądarce: Mój klub | Stroje i barwy |
-|:---:|:---:|:---:|:---:|
-| <a href="docs/screenshots/www-1-home.png"><img src="docs/screenshots/thumbs/www-1-home.png" alt="Strona główna"></a> | <a href="docs/screenshots/www-2-account.png"><img src="docs/screenshots/thumbs/www-2-account.png" alt="Konto"></a> | <a href="docs/screenshots/www-3-game-club.png"><img src="docs/screenshots/thumbs/www-3-game-club.png" alt="Mój klub w przeglądarce"></a> | <a href="docs/screenshots/www-4-game-kits.png"><img src="docs/screenshots/thumbs/www-4-game-kits.png" alt="Stroje i barwy"></a> |
-| pobieranie APK | klub, monety, połączenie aplikacji | ta sama sesja co strona | kupno strojów za monety |
+<p>
+<a href="docs/screenshots/android-1-menu.png"><img src="docs/screenshots/thumbs/android-1-menu.png" alt=""></a>
+<a href="docs/screenshots/android-2-match.png"><img src="docs/screenshots/thumbs/android-2-match.png" alt=""></a>
+<a href="docs/screenshots/android-3-club.png"><img src="docs/screenshots/thumbs/android-3-club.png" alt=""></a>
+<a href="docs/screenshots/android-4-market.png"><img src="docs/screenshots/thumbs/android-4-market.png" alt=""></a>
+<a href="docs/screenshots/android-5-club-match.png"><img src="docs/screenshots/thumbs/android-5-club-match.png" alt=""></a>
+<a href="docs/screenshots/android-6-landscape.png"><img src="docs/screenshots/thumbs/android-6-landscape.png" alt=""></a>
+<a href="docs/screenshots/www-1-home.png"><img src="docs/screenshots/thumbs/www-1-home.png" alt=""></a>
+<a href="docs/screenshots/www-2-account.png"><img src="docs/screenshots/thumbs/www-2-account.png" alt=""></a>
+<a href="docs/screenshots/www-3-game-club.png"><img src="docs/screenshots/thumbs/www-3-game-club.png" alt=""></a>
+<a href="docs/screenshots/www-4-game-kits.png"><img src="docs/screenshots/thumbs/www-4-game-kits.png" alt=""></a>
+</p>
 
 ## Co jest w grze
 
