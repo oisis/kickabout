@@ -59,10 +59,24 @@ function pitch(ctx: CanvasRenderingContext2D, surface: number) {
     else ctx.arc(W / 2, gy - PEN_SPOT, CIRCLE_R, -Math.PI / 2 - a2, -Math.PI / 2 + a2);
     ctx.stroke();
   }
-  ctx.fillStyle = 'rgba(255,255,255,0.18)';
-  ctx.fillRect(W / 2 - GOAL_HALF, -2 * M - CROSSBAR, GOAL_HALF * 2, 2 * M);
-  ctx.fillRect(W / 2 - GOAL_HALF, H - CROSSBAR, GOAL_HALF * 2, 2 * M + CROSSBAR);
+  net(ctx, W / 2 - GOAL_HALF, -2 * M - CROSSBAR, GOAL_HALF * 2, 2 * M);
+  net(ctx, W / 2 - GOAL_HALF, H - CROSSBAR, GOAL_HALF * 2, 2 * M + CROSSBAR);
   goalFrame(ctx, 0);
+}
+
+/** Goal net behind the frame: a light veil with a thin square mesh. */
+function net(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  const step = 0.4 * M;
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 0.03 * M;
+  ctx.beginPath();
+  for (let i = x; i <= x + w + 1; i += step) { ctx.moveTo(i, y); ctx.lineTo(i, y + h); }
+  for (let j = y; j <= y + h + 1; j += step) { ctx.moveTo(x, j); ctx.lineTo(x + w, j); }
+  ctx.stroke();
+  ctx.lineWidth = 0.06 * M;
+  ctx.strokeRect(x, y, w, h);
 }
 
 function goalFrame(ctx: CanvasRenderingContext2D, gy: number) {
@@ -93,7 +107,7 @@ function player(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, view: 
   const kit = info.kits[t], shirt = i === 0 ? info.keepers[t] : kit.shirt;
   ellipse(ctx, p.x + 0.15 * M, p.y, 0.5 * M, 0.22 * M, 'rgba(0,0,0,0.3)');
   if (p.slide || p.down) {
-    lying(ctx, p, shirt, kit.shorts, !!p.slide);
+    lying(ctx, p, shirt, kit.shorts, !!p.slide || !p.fell);
     return;
   }
   // Running: legs swing gently along the facing direction, the body bobs a little.
@@ -109,6 +123,7 @@ function player(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, view: 
   ctx.fillStyle = kit.shorts;
   ctx.fillRect(p.x - 0.28 * M, p.y - 1.05 * M - bob, 0.56 * M, 0.32 * M);
   ellipse(ctx, p.x, p.y - 1.35 * M - bob, 0.42 * M, 0.45 * M, shirt);
+  shirtNumber(ctx, p.n + 1, p.x, p.y - 1.32 * M - bob, shirt);
   if (p.yel) { ctx.fillStyle = '#facc15'; ctx.fillRect(p.x + 0.2 * M, p.y - 1.6 * M - bob, 0.14 * M, 0.2 * M); }
   const hx = p.x + fx * 0.08 * M, hy = p.y - 2.0 * M + fy * 0.05 * M - bob;
   ellipse(ctx, hx, hy, 0.25 * M, 0.26 * M, '#e8b98a');
@@ -125,9 +140,19 @@ function player(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, view: 
   }
 }
 
+/** Squad number on the shirt, dark or light depending on the shirt colour. */
+function shirtNumber(ctx: CanvasRenderingContext2D, n: number, x: number, y: number, shirt: string) {
+  const c = parseInt(shirt.slice(1), 16), light = ((c >> 16) * 299 + ((c >> 8) & 255) * 587 + (c & 255) * 114) / 1000 > 150;
+  ctx.font = `800 ${0.5 * M}px system-ui, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = light ? '#111827' : '#fff';
+  ctx.fillText(String(n), x, y);
+  ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+}
+
 /**
  * A player on the ground, drawn in the facing direction: a slide tackle goes feet
- * first (legs towards the ball, head behind); a fallen player lies head first.
+ * first (legs towards the ball, head behind) until they are back up; a fouled player lies head first.
  */
 function lying(ctx: CanvasRenderingContext2D, p: Player, shirt: string, shorts: string, feetFirst: boolean) {
   ctx.save();
@@ -145,13 +170,35 @@ function lying(ctx: CanvasRenderingContext2D, p: Player, shirt: string, shorts: 
   ctx.restore();
 }
 
+/** A classic black-and-white ball (centre pentagon, five patches at the rim) that turns as it rolls. */
 function ball(ctx: CanvasRenderingContext2D, s: State) {
-  const b = s.ball, r = 0.24 * M * (1 + b.z / (8 * M));
-  ellipse(ctx, b.x + b.z * 0.3, b.y, 0.22 * M, 0.12 * M, 'rgba(0,0,0,0.35)');
-  ctx.beginPath(); ctx.arc(b.x, b.y - b.z - 0.22 * M, r, 0, Math.PI * 2);
+  const b = s.ball, r = 0.28 * M * (1 + b.z / (8 * M)), x = b.x, y = b.y - b.z - 0.22 * M;
+  ellipse(ctx, b.x + b.z * 0.3, b.y, 0.26 * M, 0.13 * M, 'rgba(0,0,0,0.35)');
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.clip();
+  ctx.translate(x, y);
+  ctx.rotate((b.x + b.y) / (2 * r)); // rolling distance → turn
+  ctx.fillStyle = '#111'; ctx.strokeStyle = '#4b5563'; ctx.lineWidth = 0.025 * M;
+  pentagon(ctx, 0, 0, r * 0.36, 0);
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+    line(ctx, Math.cos(a) * r * 0.36, Math.sin(a) * r * 0.36, Math.cos(a) * r * 0.75, Math.sin(a) * r * 0.75); // seams
+    pentagon(ctx, Math.cos(a) * r * 1.02, Math.sin(a) * r * 1.02, r * 0.3, a + Math.PI);
+  }
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.lineWidth = 0.05 * M; ctx.strokeStyle = '#111'; ctx.stroke();
-  ellipse(ctx, b.x - r * 0.25, b.y - b.z - 0.22 * M - r * 0.2, r * 0.32, r * 0.32, '#111');
+}
+
+function pentagon(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, turn: number) {
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a = turn - Math.PI / 2 + (i * 2 * Math.PI) / 5;
+    ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+  }
+  ctx.closePath(); ctx.fill();
 }
 
 function text(ctx: CanvasRenderingContext2D, str: string, x: number, y: number, size: number, color = '#fff') {

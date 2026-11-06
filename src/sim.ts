@@ -67,6 +67,7 @@ export interface Player extends Skills {
   ax: number; ay: number; // actual velocity (pitch grip blends towards wanted)
   fx: number; fy: number; // facing ×1000
   slide: number; down: number; cool: number;
+  fell: number; // 1 = knocked over (lies head first), 0 = getting up after own slide (feet first)
   yel: number; off: number; // yellow cards, sent off
 }
 export interface Ball { x: number; y: number; z: number; vx: number; vy: number; vz: number }
@@ -169,7 +170,7 @@ export function newMatch(seed: number, setup: MatchSetup): State {
     after: null, event: '', eventFrame: 0,
   };
   s.teams = setup.teams.map((t, ti) => t.lineup.map((n) => ({
-    ...s.squads[ti][n], n, x: 0, y: 0, vx: 0, vy: 0, ax: 0, ay: 0, fx: 0, fy: 0, slide: 0, down: 0, cool: 0, yel: 0, off: 0,
+    ...s.squads[ti][n], n, x: 0, y: 0, vx: 0, vy: 0, ax: 0, ay: 0, fx: 0, fy: 0, slide: 0, down: 0, fell: 0, cool: 0, yel: 0, off: 0,
   })));
   s.firstKickoff = rnd(s, 2);
   startPeriod(s, 0);
@@ -393,7 +394,7 @@ function live(s: State, inputs: readonly number[]) {
       const pkActor = s.pk && ((t === s.pk.team && i === s.pk.idx) || (i === 0 && t !== s.pk.team));
       const frozen = s.pk && !pkActor && (!s.pk.kicked || s.period === 4);
       if (p.slide > 0) {
-        if (--p.slide === 0) { p.down = 24; p.vx = p.vy = 0; }
+        if (--p.slide === 0) { p.down = 24; p.fell = 0; p.vx = p.vy = 0; }
       } else if (p.down > 0) {
         p.down--; p.vx = p.vy = 0;
       } else if (frozen) {
@@ -647,7 +648,7 @@ function onTarget(s: State, t: number) {
 function foul(s: State, t: number, slider: Player, victim: Player) {
   const f = 1 - t, b = s.ball;
   s.stats.fouls[t]++;
-  victim.down = 45;
+  victim.down = 45; victim.fell = 1;
   const r = rnd(s, 100);
   if (r < 6 || (r < 28 && slider.yel > 0)) {
     if (r >= 6) s.stats.yellow[t]++;
@@ -679,7 +680,7 @@ function contest(s: State) {
       if (o && !nearBall && dist2(p, o.x, o.y) < 500 * 500) { foul(s, t, p, o); return; }
       if (!nearBall) continue;
       if (o && rnd(s, 100) < 30 - p.ta * 3) { foul(s, t, p, o); return; } // mistimed
-      if (o) o.down = 30;
+      if (o) { o.down = 30; o.fell = 1; }
       s.ownerTeam = s.ownerIdx = -1;
       b.vx = div(p.fx * 260, 1000); b.vy = div(p.fy * 260, 1000); b.vz = 20;
       s.lastTouch = t; s.lastIdx = i; p.cool = 10;
