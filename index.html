@@ -14,6 +14,9 @@
       canvas { display: block; width: 100vw; height: 100vh; touch-action: none; user-select: none; -webkit-user-select: none; }
       #ui { position: fixed; inset: 0; overflow-y: auto; background: var(--panel); padding: max(16px, env(safe-area-inset-top)) 16px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; align-items: stretch; max-width: 640px; margin: 0 auto; }
       #ui[hidden] { display: none; }
+      .kit-preview { display: flex; flex-direction: column; width: 46px; flex: 0 0 46px !important; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+      .kit-preview span:first-child { height: 30px; } .kit-preview span:last-child { height: 16px; }
+      .logo .ball { width: 0.74em; height: 0.74em; vertical-align: -0.02em; margin: 0 0.03em; filter: drop-shadow(0 4px 0 #000); }
       .logo { font: 900 clamp(44px, 14vw, 72px) system-ui, sans-serif; color: var(--accent); text-align: center; margin: 4vh 0 2vh; text-shadow: 0 4px 0 #000; letter-spacing: 1px; }
       header h1 { margin: 6px 0 0; font-size: 26px; }
       header .sub, .sub { margin: 2px 0 6px; color: var(--muted); }

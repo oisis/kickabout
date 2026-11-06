@@ -11,6 +11,7 @@ export const SELL_RATE = 0.6; // selling a player to the computer market
 export const SWAP_PAY = 1.1, SWAP_GET = 0.8; // swap: pay 110% of a value gap, receive 80% of it
 export const CLUB_MARKUP = 1.5, CLUB_BASE = 5000; // a whole club costs 150% of its squad + a base fee
 export const SPONSOR_MIN = 100;
+export const KIT_PRICE = 400; // each new kit set (home, away, goalkeeper)
 export const DAILY_REWARDS = { cpu: 10, online: 20 }; // rewarded matches per day
 export const INACTIVE_DAYS = 30; // an owner idle this long loses the club to the computer
 

@@ -17,7 +17,7 @@ import pkg from '../package.json' with { type: 'json' };
 
 export function mainMenu(app: App) {
   show(
-    h('div', { className: 'logo' }, 'KICKABOUT'),
+    logo(),
     h('nav', {},
       btn(tr('Mecz towarzyski'), () => friendly(app), 'big'),
       btn(tr('Rozgrywki'), () => compMenu(app), 'big'),
@@ -33,6 +33,14 @@ export function mainMenu(app: App) {
     h('p', { className: 'hint' }, `Kickabout ${pkg.version}`),
     h('p', { className: 'hint' }, tr('Dotyk: lewa strona – bieg, po prawej PODANIE i STRZAŁ (przytrzymaj = mocniej), bez piłki – wślizg. Klawiatura: strzałki, spacja = podanie, M = strzał (gracz 2: WASD, F = podanie, G = strzał). Pad: drążek, A = podanie, B = strzał, Start = pauza.')),
   );
+}
+
+/** KICKABOUT with a football for the O (static SVG markup). */
+const BALL_SVG = '<svg class="ball" viewBox="-50 -50 100 100" aria-hidden="true"><defs><clipPath id="ball-clip"><circle r="46"/></clipPath></defs><circle r="46" fill="#fff"/><g clip-path="url(#ball-clip)" fill="#111"><polygon points="0.0,-16.0 15.2,-4.9 9.4,12.9 -9.4,12.9 -15.2,-4.9"/><polygon points="0.0,-34.0 -12.4,-43.0 -7.6,-57.5 7.6,-57.5 12.4,-43.0"/><polygon points="32.3,-10.5 37.1,-25.0 52.3,-25.0 57.1,-10.5 44.7,-1.5"/><polygon points="20.0,27.5 35.3,27.5 40.0,42.0 27.6,51.0 15.3,42.0"/><polygon points="-20.0,27.5 -15.3,42.0 -27.6,51.0 -40.0,42.0 -35.3,27.5"/><polygon points="-32.3,-10.5 -44.7,-1.5 -57.1,-10.5 -52.3,-25.0 -37.1,-25.0"/><path d="M0.0 -16.0L0.0 -36.0 M15.2 -4.9L34.2 -11.1 M9.4 12.9L21.2 29.1 M-9.4 12.9L-21.2 29.1 M-15.2 -4.9L-34.2 -11.1" stroke="#333" stroke-width="2.5"/></g><circle r="46" fill="none" stroke="#111" stroke-width="4"/></svg>';
+function logo() {
+  const el = h('div', { className: 'logo', role: 'img', ariaLabel: 'Kickabout' });
+  el.innerHTML = `KICKAB${BALL_SVG}UT`;
+  return el;
 }
 
 export const allTeams = (): TeamDef[] => TEAMS.map((t) => team(t.id, customTeams()));

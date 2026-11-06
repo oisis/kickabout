@@ -11,6 +11,7 @@ img { max-width: 100%; }
 
 header.top { position: sticky; top: 0; z-index: 5; background: rgba(12, 58, 31, 0.92); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); }
 header.top .wrap { display: flex; align-items: center; gap: 16px; height: 60px; }
+.brand .ball { width: 0.8em; height: 0.8em; vertical-align: -0.1em; margin: 0 0.03em; filter: drop-shadow(0 2px 0 #000); }
 .brand { font-weight: 900; font-size: 22px; letter-spacing: 0.5px; color: var(--accent); text-decoration: none; text-shadow: 0 2px 0 #000; }
 header nav { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 header nav a { color: var(--fg); text-decoration: none; font-weight: 600; }

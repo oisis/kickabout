@@ -180,7 +180,7 @@ export function clubs(db: DatabaseSync, now = () => Date.now()) {
     const need = () => user?.id ?? fail('signed-out');
     try {
       if (path === '/economy' && method === 'GET') {
-        send(200, { startCoins: E.START_COINS, buyMarkup: E.BUY_MARKUP, sellRate: E.SELL_RATE, swapPay: E.SWAP_PAY, swapGet: E.SWAP_GET, sponsorMin: E.SPONSOR_MIN, daily: E.DAILY_REWARDS, inactiveDays: E.INACTIVE_DAYS, squad: [E.SQUAD_MIN, E.SQUAD_MAX] });
+        send(200, { startCoins: E.START_COINS, kitPrice: E.KIT_PRICE, buyMarkup: E.BUY_MARKUP, sellRate: E.SELL_RATE, swapPay: E.SWAP_PAY, swapGet: E.SWAP_GET, sponsorMin: E.SPONSOR_MIN, daily: E.DAILY_REWARDS, inactiveDays: E.INACTIVE_DAYS, squad: [E.SQUAD_MIN, E.SQUAD_MAX] });
       } else if (path === '/clubs' && method === 'GET') {
         // ?group=<country>:<division> (computer and bought clubs of a league), players (clubs players created) or owned.
         const g = c.url.searchParams.get('group') ?? 'owned';
@@ -216,6 +216,21 @@ export function clubs(db: DatabaseSync, now = () => Date.now()) {
           save({ id, owner: u, custom: true, team: { id, name, short, national: false, country: 'xx', division: 0, level: E.NEW_CLUB_LEVEL, kits: [{ shirt, shorts }, { shirt: shorts, shorts: shirt }], keeper: '#22c55e', formation: 0, players: E.newSquad(id, lang) } });
         });
         send(200, detail(club(id)!, u));
+      } else if (path === '/me/club/kits' && method === 'POST') {
+        // New kits: home and away (shirt + shorts) and the goalkeeper's shirt, KIT_PRICE for each one changed.
+        const u = need(), b = await c.body();
+        const color = (v: unknown, old: string) => (typeof v === 'string' && COLOR.test(v) ? v.toLowerCase() : old.toLowerCase());
+        const cost = tx(() => {
+          const x = mine(u) ?? fail('no-club'), t = x.team;
+          const kits = [b.home, b.away].map((k, i) => ({ shirt: color(k?.shirt, t.kits[i].shirt), shorts: color(k?.shorts, t.kits[i].shorts) })) as TeamDef['kits'];
+          const keeper = color(b.keeper, t.keeper);
+          const changed = kits.filter((k, i) => k.shirt !== t.kits[i].shirt.toLowerCase() || k.shorts !== t.kits[i].shorts.toLowerCase()).length + (keeper !== t.keeper.toLowerCase() ? 1 : 0);
+          if (!changed) fail('unchanged');
+          pay(u, -changed * E.KIT_PRICE, 'kits', t.name);
+          t.kits = kits; t.keeper = keeper; save(x); touch(u);
+          return changed * E.KIT_PRICE;
+        });
+        send(200, { cost, coins: coins(u), club: detail(mine(u)!, u) });
       } else if (path === '/me/club/leave' && method === 'POST') {
         const u = need();
         tx(() => {

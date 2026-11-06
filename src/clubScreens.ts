@@ -5,6 +5,7 @@ import { POS, LEAGUE_COUNTRIES, leagueLabel, teamSetup, type TeamDef, type Playe
 import { makeSpec } from './match.ts';
 import { options, minuteOptions } from './store.ts';
 import { api, setToken, rle } from './api.ts';
+import { KIT_PRICE } from './economy.ts';
 import { inApp, siteUrl } from './net.ts';
 import { h, show, title, btn, row, back, select, input, table, toast } from './ui.ts';
 import { t as tr, lang } from './i18n.ts';
@@ -20,7 +21,7 @@ const skill = (p: PlayerDef) => (p.pos === 0 ? p.gk : Math.round((p.pa + p.sh + 
 const ERRORS: Record<string, string> = {
   coins: tr('Za mało monet'), 'has-club': tr('Masz już klub'), 'no-club': tr('Najpierw załóż albo kup klub'), 'squad-small': tr('Za mały skład (minimum 14)'),
   'squad-full': tr('Pełny skład (maksimum 22)'), 'last-keeper': tr('Drużyna musi mieć bramkarza'), changed: tr('Oferta jest już nieaktualna'), limit: tr('Wykorzystano dzienny limit meczów o nagrodę'),
-  name: tr('Nazwa: 3–24 znaki'), short: tr('Skrót: 3 litery'), amount: tr('Za mała kwota'), incomplete: tr('Mecz nie został dokończony'),
+  unchanged: tr('Nic się nie zmieniło'), name: tr('Nazwa: 3–24 znaki'), short: tr('Skrót: 3 litery'), amount: tr('Za mała kwota'), incomplete: tr('Mecz nie został dokończony'),
 };
 const fail = (r: { status: number; data: unknown }) => toast(r.status === 0 ? tr('Brak połączenia z serwerem') : ERRORS[(r.data as { error?: string }).error ?? ''] ?? tr('Coś poszło nie tak'));
 const ask = (text: string, value: number) => { const v = prompt(text, String(value)); return v === null ? null : Math.round(Number(v)); };
@@ -39,6 +40,7 @@ export async function clubMenu(app: App) {
     h('nav', {},
       btn(tr('Mecz o nagrodę ({0} dziś)', d.rewardsLeft.cpu), () => prizeMatch(app, d), 'primary big'),
       btn(tr('Skład'), () => squad(app, d)),
+      btn(tr('Stroje i barwy'), () => kits(app, d)),
       btn(tr('Rynek transferowy'), () => market(app, d)),
       btn(incoming ? tr('Oferty ({0} nowe)', incoming) : tr('Oferty'), () => offers(app, d)),
       btn(tr('Historia konta'), () => ledger(app, d)),
@@ -100,6 +102,29 @@ function squad(app: App, d: MyClub) {
     }),
     back(() => clubMenu(app)),
   );
+}
+
+/** Club colours: new home and away kits and the goalkeeper's shirt, bought with coins. */
+function kits(app: App, d: MyClub) {
+  const t = d.club!.team;
+  const next = { home: { ...t.kits[0] }, away: { ...t.kits[1] }, keeper: t.keeper };
+  const preview = (shirt: string, shorts: string) => h('div', { className: 'kit-preview' }, h('span', { style: { background: shirt } }), h('span', { style: { background: shorts } }));
+  const changed = () => [0, 1].filter((i) => { const k = i ? next.away : next.home; return k.shirt !== t.kits[i].shirt || k.shorts !== t.kits[i].shorts; }).length + (next.keeper !== t.keeper ? 1 : 0);
+  const color = (label: string, get: () => string, set: (v: string) => void) => h('label', { className: 'field' }, h('span', {}, label),
+    h('input', { type: 'color', value: get(), oninput: (e: Event) => { set((e.target as HTMLInputElement).value.toLowerCase()); draw(); } }));
+  const draw = () => show(
+    title(tr('Stroje i barwy'), tr('Masz {0}. Każdy nowy komplet kosztuje {1}.', coins(d.coins), coins(KIT_PRICE))),
+    h('h3', {}, tr('Strój domowy')), row(preview(next.home.shirt, next.home.shorts), color(tr('Koszulka'), () => next.home.shirt, (v) => { next.home.shirt = v; }), color(tr('Spodenki'), () => next.home.shorts, (v) => { next.home.shorts = v; })),
+    h('h3', {}, tr('Strój wyjazdowy')), row(preview(next.away.shirt, next.away.shorts), color(tr('Koszulka'), () => next.away.shirt, (v) => { next.away.shirt = v; }), color(tr('Spodenki'), () => next.away.shorts, (v) => { next.away.shorts = v; })),
+    h('h3', {}, tr('Bramkarz')), row(preview(next.keeper, next.home.shorts), color(tr('Koszulka'), () => next.keeper, (v) => { next.keeper = v; })),
+    btn(changed() ? tr('Kup stroje za {0}', coins(changed() * KIT_PRICE)) : tr('Wybierz nowe kolory'), async () => {
+      if (!changed()) return;
+      const r = await api('/me/club/kits', next);
+      if (r.status === 200) { toast(tr('Nowe stroje gotowe')); clubMenu(app); } else fail(r);
+    }, 'primary'),
+    back(() => clubMenu(app)),
+  );
+  draw();
 }
 
 async function market(app: App, d: MyClub, group = `${LEAGUE_COUNTRIES.find((c) => c.code === 'pl')?.code ?? 'en'}:4`) {
@@ -181,7 +206,7 @@ function offers(app: App, d: MyClub) {
 }
 
 const KINDS: Record<string, string> = {
-  'reward-cpu': tr('Nagroda: mecz z komputerem'), 'reward-online': tr('Nagroda: mecz online'), 'player-buy': tr('Kupno zawodnika'), 'player-sell': tr('Sprzedaż zawodnika'),
+  kits: tr('Nowe stroje'), 'reward-cpu': tr('Nagroda: mecz z komputerem'), 'reward-online': tr('Nagroda: mecz online'), 'player-buy': tr('Kupno zawodnika'), 'player-sell': tr('Sprzedaż zawodnika'),
   swap: tr('Wymiana'), 'swap-buy': tr('Wymiana'), 'swap-sell': tr('Wymiana'), 'club-buy': tr('Kupno klubu'), 'club-sell': tr('Sprzedaż klubu'), sponsor: tr('Sponsoring'), sponsored: tr('Od sponsora'),
 };
 function ledger(app: App, d: MyClub) {

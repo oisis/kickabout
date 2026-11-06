@@ -8,7 +8,7 @@ import { clubs } from '../server/clubs.ts';
 import { newMatch, step, type MatchSetup } from '../src/sim.ts';
 import { teamSetup, onlineMatch } from '../src/data.ts';
 import { cpuInput } from '../src/ai.ts';
-import { START_COINS, playerPrice, BUY_MARKUP, SELL_RATE, SPONSOR_MIN } from '../src/economy.ts';
+import { START_COINS, playerPrice, BUY_MARKUP, SELL_RATE, SPONSOR_MIN, KIT_PRICE } from '../src/economy.ts';
 
 /** A signed-in player (dev login) talking JSON to the API with a cookie. */
 async function player(base: string, name: string) {
@@ -47,6 +47,14 @@ test('clubs: create, buy and sell, swap, offers that need consent, sponsors, buy
   assert.equal((await ala.call(`/clubs/${target.id}`)).data.players.length, 16);
   a = await ala.me();
   assert.ok(a.club.team.players.some((p: any) => p.name === cheapest.name));
+
+  // New kits cost KIT_PRICE per changed set; nothing changed is refused.
+  const kitsBefore = (await ala.me()).coins;
+  const k = await ala.call('/me/club/kits', { home: { shirt: '#123456', shorts: '#FFFFFF' }, keeper: '#00ff00' });
+  assert.equal(k.status, 200, JSON.stringify(k.data));
+  assert.equal(k.data.coins, kitsBefore - 2 * KIT_PRICE);
+  assert.deepEqual(k.data.club.team.kits[0], { shirt: '#123456', shorts: '#ffffff' });
+  assert.equal((await ala.call('/me/club/kits', { home: { shirt: '#123456', shorts: '#ffffff' } })).data.error, 'unchanged');
 
   // Sell to the market at 60%.
   const sold = a.club.players.find((p: any) => p.pos === 3);
