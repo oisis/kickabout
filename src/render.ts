@@ -92,24 +92,25 @@ function ellipse(ctx: CanvasRenderingContext2D, x: number, y: number, rx: number
 function player(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, view: View, p: Player, t: number, i: number) {
   const kit = info.kits[t], shirt = i === 0 ? info.keepers[t] : kit.shirt;
   ellipse(ctx, p.x + 0.15 * M, p.y, 0.5 * M, 0.22 * M, 'rgba(0,0,0,0.3)');
-  if (p.slide || p.down) { // lying along the facing direction
-    ctx.save();
-    ctx.translate(p.x, p.y - 0.3 * M);
-    ctx.rotate(Math.atan2(p.fy, p.fx));
-    ellipse(ctx, 0, 0, 0.9 * M, 0.35 * M, shirt);
-    ellipse(ctx, 0.9 * M, 0, 0.26 * M, 0.26 * M, '#e8b98a');
-    ctx.restore();
+  if (p.slide || p.down) {
+    lying(ctx, p, shirt, kit.shorts, !!p.slide);
     return;
   }
-  const moving = p.ax || p.ay, step = moving && (s.frame >> 3) & 1 ? 0.12 * M : 0;
-  ctx.fillStyle = '#1f2937';
-  ctx.fillRect(p.x - 0.22 * M, p.y - 0.8 * M + step, 0.16 * M, 0.8 * M - step);
-  ctx.fillRect(p.x + 0.06 * M, p.y - 0.8 * M + (0.12 * M - step) * (moving ? 1 : 0), 0.16 * M, 0.8 * M);
+  // Running: legs swing gently along the facing direction, the body bobs a little.
+  const speed = Math.min(1, Math.hypot(p.ax, p.ay) / 110);
+  const phase = s.frame * 0.3 + i * 1.3 + t * 0.7, swing = Math.sin(phase) * speed;
+  const fx = p.fx / 1000, fy = p.fy / 1000, bob = Math.abs(Math.sin(phase)) * speed * 0.06 * M;
+  ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 0.16 * M; ctx.lineCap = 'round';
+  for (const [side, dir] of [[-0.12, 1], [0.12, -1]]) {
+    const reach = swing * dir * 0.24 * M, lift = Math.max(0, swing * dir) * 0.1 * M;
+    line(ctx, p.x + side * M, p.y - 0.78 * M - bob, p.x + side * M + fx * reach, p.y - 0.06 * M + fy * reach * 0.5 - lift);
+  }
+  ctx.lineCap = 'butt';
   ctx.fillStyle = kit.shorts;
-  ctx.fillRect(p.x - 0.28 * M, p.y - 1.05 * M, 0.56 * M, 0.32 * M);
-  ellipse(ctx, p.x, p.y - 1.35 * M, 0.42 * M, 0.45 * M, shirt);
-  if (p.yel) { ctx.fillStyle = '#facc15'; ctx.fillRect(p.x + 0.2 * M, p.y - 1.6 * M, 0.14 * M, 0.2 * M); }
-  const hx = p.x + (p.fx / 1000) * 0.08 * M, hy = p.y - 2.0 * M + (p.fy / 1000) * 0.05 * M;
+  ctx.fillRect(p.x - 0.28 * M, p.y - 1.05 * M - bob, 0.56 * M, 0.32 * M);
+  ellipse(ctx, p.x, p.y - 1.35 * M - bob, 0.42 * M, 0.45 * M, shirt);
+  if (p.yel) { ctx.fillStyle = '#facc15'; ctx.fillRect(p.x + 0.2 * M, p.y - 1.6 * M - bob, 0.14 * M, 0.2 * M); }
+  const hx = p.x + fx * 0.08 * M, hy = p.y - 2.0 * M + fy * 0.05 * M - bob;
   ellipse(ctx, hx, hy, 0.25 * M, 0.26 * M, '#e8b98a');
   ellipse(ctx, hx - (p.fx / 1000) * 0.08 * M, hy - (p.fy / 1000) * 0.08 * M - 0.08 * M, 0.21 * M, 0.17 * M, '#3b2416');
   const human = view.humans[t];
@@ -122,6 +123,26 @@ function player(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, view: 
     ctx.fillStyle = MARK[human - 1]; ctx.fill();
     ctx.lineWidth = 0.06 * M; ctx.strokeStyle = '#000'; ctx.stroke();
   }
+}
+
+/**
+ * A player on the ground, drawn in the facing direction: a slide tackle goes feet
+ * first (legs towards the ball, head behind); a fallen player lies head first.
+ */
+function lying(ctx: CanvasRenderingContext2D, p: Player, shirt: string, shorts: string, feetFirst: boolean) {
+  ctx.save();
+  ctx.translate(p.x, p.y - 0.3 * M);
+  ctx.rotate(Math.atan2(p.fy, p.fx) + (feetFirst ? 0 : Math.PI));
+  ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 0.16 * M; ctx.lineCap = 'round';
+  line(ctx, 0, -0.12 * M, 0.85 * M, -0.16 * M); // legs stretched out in front
+  line(ctx, 0, 0.12 * M, 0.7 * M, 0.2 * M);
+  ctx.lineCap = 'butt';
+  ctx.fillStyle = shorts;
+  ctx.fillRect(-0.2 * M, -0.26 * M, 0.34 * M, 0.52 * M);
+  ellipse(ctx, -0.5 * M, 0, 0.42 * M, 0.34 * M, shirt);
+  ellipse(ctx, -1.02 * M, 0, 0.25 * M, 0.25 * M, '#e8b98a');
+  ellipse(ctx, -1.1 * M, 0, 0.17 * M, 0.21 * M, '#3b2416');
+  ctx.restore();
 }
 
 function ball(ctx: CanvasRenderingContext2D, s: State) {
