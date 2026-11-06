@@ -45,7 +45,7 @@ Zręcznościowa piłka nożna z widokiem z góry, 11 na 11, na Androida (APK) i 
   - 8 lig europejskich (Anglia, Hiszpania, Niemcy, Włochy, Francja, Holandia, Portugalia, Polska) po 4 klasy rozgrywkowe (I–IV liga) z 12 klubami, łącznie 384 kluby;
   - nazwy klubów w formacie „prawdziwe miasto + wymyślona nazwa” (np. „London Navigators”, „Kraków Burza”);
   - 40 reprezentacji (24 z Europy, 16 z reszty świata);
-  - wszyscy zawodnicy są fikcyjni.
+  - wszyscy zawodnicy są fikcyjni: inicjał i nazwisko z list popularnych imion i nazwisk danego kraju (`src/names.ts`, 28 pul), bez nazwisk znanych piłkarzy.
 - **Gotowe rozgrywki:**
   - w każdym kraju I–IV liga i puchar kraju (48 klubów);
   - dla klubów Puchar Kontynentu (grupy, potem dwumecze) i Tarcza Kontynentu;

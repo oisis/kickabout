@@ -5,6 +5,7 @@
 import { type Skills, type TeamSetup, type MatchSetup, FORMATIONS, lineOf } from './sim.ts';
 import { t } from './i18n.ts';
 import { MATCH_MINUTES } from './store.ts';
+import { NAMES, NATION_POOL } from './names.ts';
 
 export interface PlayerDef extends Skills { name: string; age: number }
 export interface Kit { shirt: string; shorts: string }
@@ -25,27 +26,6 @@ export interface TeamDef {
 
 export const POS = ['BR', 'OB', 'PO', 'NA']; // bramkarz, obrońca, pomocnik, napastnik (translated on display)
 
-// Surname pools per region: [prefixes, suffixes, initials].
-const NAMES: Record<string, [string[], string[], string]> = {
-  pl: [['Kow', 'Mal', 'Now', 'Wiś', 'Zaj', 'Kacz', 'Pie', 'Grab', 'Sob', 'Dud', 'Jank', 'Krz', 'Wal', 'Mich', 'Bor', 'Sik', 'Ostr', 'Ziel', 'Czar', 'Bart', 'Gór', 'Lis', 'Wron', 'Kur'], ['alski', 'iński', 'owski', 'ecki', 'ak', 'czyk', 'ik', 'arek', 'ała', 'uch', 'ewicz', 'ański', 'ek', 'yński'], 'ABDFGJKLMPRSTWZ'],
-  de: [['Ham', 'Ber', 'Schm', 'Wag', 'Kel', 'Hof', 'Brau', 'Lang', 'Wolf', 'Neu', 'Kra', 'Fisch', 'Zimm', 'Sch', 'Rich', 'Bau', 'Holt', 'Vog'], ['mann', 'ner', 'idt', 'er', 'ler', 'feld', 'stein', 'berg', 'hardt', 'linger', 'au', 'bach'], 'ABDFHJKLMNPRSTUW'],
-  en: [['Har', 'Wil', 'Thom', 'Rob', 'Walk', 'Wright', 'Hugh', 'Ed', 'Turn', 'Cart', 'Mor', 'Bak', 'Clar', 'Ash', 'Brad', 'Fen', 'Gold', 'Stan'], ['ris', 'son', 'ley', 'er', 'ford', 'ton', 'ham', 'well', 'by', 'wood', 'field', 'ing'], 'ABCDGHJKLMNPRSTW'],
-  es: [['Gar', 'Fern', 'Rodr', 'Lóp', 'Mart', 'Sánch', 'Pér', 'Gom', 'Dí', 'Ruiz', 'Alv', 'Mor', 'Ort', 'Delg', 'Cast', 'Ram', 'Torr', 'Var'], ['cía', 'ández', 'íguez', 'ez', 'ínez', 'ero', 'ado', 'illo', 'ales', 'ón', 'eda', 'ino'], 'ACDEFGJLMPRSV'],
-  pt: [['Silv', 'Sant', 'Ferr', 'Per', 'Oliv', 'Cost', 'Rodr', 'Mart', 'Sous', 'Fern', 'Gonç', 'Gom', 'Lop', 'Marq', 'Alv', 'Ribe', 'Pint', 'Carv'], ['a', 'os', 'eira', 'es', 'ira', 'ão', 'inho', 'ado', 'alves', 'ues', 'ida', 'elo'], 'ABCDFGJLMNPRTV'],
-  it: [['Ros', 'Bian', 'Rom', 'Col', 'Ric', 'Mar', 'Gal', 'Con', 'Fer', 'Esp', 'Bru', 'Mor', 'Lom', 'Ser', 'Ves', 'Carb', 'Fab', 'Pell'], ['si', 'chi', 'ano', 'ombo', 'ci', 'ini', 'otti', 'ello', 'etti', 'oni', 'ucci', 'ardi'], 'ACDFGLMNPRSV'],
-  fr: [['Mart', 'Bern', 'Dub', 'Thom', 'Rob', 'Rich', 'Pet', 'Dur', 'Lem', 'Leg', 'Gar', 'Fourn', 'Mor', 'Gir', 'Ber', 'Lamb', 'Chev', 'Fau'], ['in', 'ard', 'ois', 'as', 'ert', 'and', 'ier', 'eau', 'et', 'ot', 'aud', 'on'], 'ABCDFGHJLMNPRTY'],
-  nl: [['Jans', 'Vis', 'Bak', 'Meij', 'Smi', 'Mul', 'Bos', 'Vos', 'Dek', 'Hen', 'Brou', 'Kuip', 'Verh', 'Stee', 'Wil', 'Bra', 'Dijk', 'Hoek'], ['sen', 'ser', 'ker', 'er', 'ts', 'der', 'ma', 'stra', 'kamp', 'man', 'veld', 'hof'], 'ABDFGJKLMNPRSTW'],
-  sv: [['Lind', 'Berg', 'Holm', 'Ny', 'Lund', 'Ström', 'Sand', 'Ek', 'Dahl', 'Sjö', 'Fors', 'Hag', 'Ols', 'Johans', 'Lars', 'Karl'], ['gren', 'ström', 'berg', 'qvist', 'man', 'lund', 'sen', 'son', 'dal', 'ius'], 'ABEFHJKLMNOPSTV'],
-  tr: [['Yıl', 'Kay', 'Demir', 'Şah', 'Çel', 'Yıld', 'Arsl', 'Doğ', 'Kılı', 'Akt', 'Özd', 'Kor', 'Erd', 'Tun', 'Gün', 'Aks'], ['maz', 'a', 'el', 'in', 'ik', 'ız', 'an', 'çer', 'oğlu', 'ürk', 'emir', 'kan'], 'ABCEHKMOSTUY'],
-  gr: [['Papa', 'Geor', 'Dimi', 'Kon', 'Nik', 'Ioan', 'Vass', 'Chris', 'Pet', 'Kara', 'Ath', 'Mich'], ['dopoulos', 'giou', 'triou', 'stantinou', 'olaou', 'nidis', 'iliou', 'tou', 'rakis', 'manlis', 'anasiou', 'ailidis'], 'ACDGKMNPSTV'],
-  hu: [['Nagy', 'Kov', 'Tót', 'Szab', 'Hor', 'Varg', 'Kis', 'Mol', 'Ném', 'Farka', 'Bal', 'Pap'], ['', 'ács', 'h', 'ó', 'váth', 'a', 'nár', 'eth', 'as', 'ogh', 'p', 'ai'], 'ABDGKLMPSTZ'],
-  ro: [['Pop', 'Ion', 'Dum', 'Stan', 'Stoi', 'Gheor', 'Rad', 'Mun', 'Con', 'Mar', 'Toma', 'Dinu'], ['escu', 'itru', 'ciu', 'ca', 'ghe', 'u', 'teanu', 'stantin', 'in', 'oiu', 'lescu', 'ache'], 'ABCDFGIMRSV'],
-  ja: [['Tana', 'Yama', 'Naka', 'Suzu', 'Kawa', 'Mori', 'Ishi', 'Hara', 'Fuji', 'Taka', 'Sato', 'Kimu', 'Matsu', 'Ino', 'Haya', 'Endo'], ['ka', 'moto', 'mura', 'da', 'gawa', 'shi', 'ki', 'no', 'ta', 'ri', 'uchi', 'zawa'], 'AHJKMNRSTY'],
-  ko: [['Kim', 'Lee', 'Park', 'Choi', 'Jung', 'Kang', 'Cho', 'Yoon', 'Jang', 'Lim', 'Han', 'Shin', 'Seo', 'Kwon', 'Hwang', 'Ahn'], [''], 'BCDHJKMSWY'],
-  ar: [['Al-Ha', 'Ben', 'El-Sa', 'Ham', 'Mans', 'Nas', 'Kar', 'Sal', 'Yous', 'Rah', 'Taw', 'Kha', 'Zak', 'Am'], ['ssan', 'ali', 'idi', 'dan', 'our', 'ri', 'imi', 'ah', 'sef', 'man', 'fik', 'led'], 'AHKMNOSY'],
-  af: [['Diall', 'Kon', 'Traor', 'Ndi', 'Okon', 'Mens', 'Ade', 'Ouat', 'Bamb', 'Sow', 'Eze', 'Kamar', 'Osei', 'Ndl'], ['o', 'até', 'é', 'aye', 'kwo', 'ah', 'yemi', 'tara', 'a', 'ou', 'kiel', 'ra'], 'ABCDEIKMOSY'],
-};
-
 function prng(seed: number) {
   let x = seed >>> 0 || 1;
   return (n: number) => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x % n; };
@@ -63,12 +43,12 @@ const BIAS = [[-2, -2, -2, -2, 0, 0], [0, -2, 1, 2, 0, 0], [2, 0, 0, 0, 1, 0], [
 const SQUAD_POS = [0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 0, 1, 2, 2, 3]; // 11 starters (4-4-2) + 5 bench
 
 export function makePlayers(id: string, level: number, lang: string): PlayerDef[] {
-  const r = prng(hashId(id));
-  const [a, b, initials] = NAMES[lang] ?? NAMES.en;
+  const r = prng(hashId(id)), rn = prng(hashId(`${id}/names`)); // names have their own stream: lists can change without touching skills
+  const [first, last] = NAMES[lang] ?? NAMES.en;
   const used = new Set<string>();
   return SQUAD_POS.map((pos) => {
     let name = '';
-    do name = `${initials[r(initials.length)]}. ${a[r(a.length)]}${b[r(b.length)]}`; while (used.has(name));
+    do name = `${first[rn(first.length)][0]}. ${last[rn(last.length)]}`; while (used.has(name));
     used.add(name);
     const v = (k: number) => clamp9(level + r(5) - 2 + BIAS[pos][k]);
     return { name, pos, pa: v(0), sh: v(1), he: v(2), ta: v(3), co: v(4), sp: v(5), gk: pos === 0 ? clamp9(level + r(5) - 1) : 0, age: 18 + r(16) };
@@ -170,7 +150,7 @@ function nations(): TeamDef[] {
     const id = `n-${cc}`, k = prng(hashId(id));
     return {
       id, name: t(name), short, national: true, country: region, division: 0, level,
-      kits: [{ shirt, shorts }, { shirt: shorts, shorts: shirt }], keeper: KEEPERS[k(KEEPERS.length)], formation: k(FORMATIONS.length), players: makePlayers(id, level, pool),
+      kits: [{ shirt, shorts }, { shirt: shorts, shorts: shirt }], keeper: KEEPERS[k(KEEPERS.length)], formation: k(FORMATIONS.length), players: makePlayers(id, level, NATION_POOL[cc] ?? pool),
     };
   });
 }
