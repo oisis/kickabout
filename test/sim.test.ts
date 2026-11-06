@@ -28,6 +28,7 @@ test('CPU vs CPU reaches full time on every pitch with integer-only state', (t) 
     const s = play(7 + pitch, { pitch });
     assert.equal(s.phase, 'end');
     assertIntegers(s);
+    for (const t of [0, 1]) assert.ok(s.stats.onTarget[t] <= s.stats.shots[t], `on target ${s.stats.onTarget} > shots ${s.stats.shots}`);
     t.diagnostic(`pitch ${pitch}: ${s.score.join(':')} shots ${s.stats.shots} fouls ${s.stats.fouls} cards ${s.stats.yellow}/${s.stats.red} subs left ${s.subsLeft}`);
   }
 });

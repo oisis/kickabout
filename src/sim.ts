@@ -627,7 +627,7 @@ function keeperSave(s: State, t: number) {
   const speed = isqrt(b.vx * b.vx + b.vy * b.vy);
   const towardGoal = (gy === 0 ? -b.vy : b.vy) > 150;
   if (rnd(s, 100) >= clamp(130 - div(speed, 4) + (k.gk - 5) * 6, 15, 97)) { k.cool = 30; return; } // beaten
-  if (towardGoal) s.stats.onTarget[1 - t]++;
+  if (towardGoal) onTarget(s, 1 - t);
   if (speed > 330) {
     b.vy = -div(b.vy * 4, 10); b.vx = div(b.vx * 6, 10) + rnd(s, 161) - 80; b.vz = 45;
     s.ownerTeam = s.ownerIdx = -1; s.lastTouch = t; s.lastIdx = 0; k.cool = 24;
@@ -636,6 +636,12 @@ function keeperSave(s: State, t: number) {
   }
   if (speed > 200) say(s, 'save');
   give(s, t, 0);
+}
+
+/** A save or a goal is an attempt on target even when it was not struck as a shot (a cross, a deflection). */
+function onTarget(s: State, t: number) {
+  s.stats.onTarget[t]++;
+  s.stats.shots[t] = Math.max(s.stats.shots[t], s.stats.onTarget[t]);
 }
 
 function foul(s: State, t: number, slider: Player, victim: Player) {
@@ -744,7 +750,7 @@ function rules(s: State) {
   if (Math.abs(b.x - W / 2) < GOAL_HALF && b.z < CROSSBAR) {
     const scorer = 1 - end, scorerPlayer = s.teams[s.lastTouch][s.lastIdx];
     s.score[scorer]++;
-    s.stats.onTarget[scorer]++;
+    onTarget(s, scorer);
     s.stats.goals.push({ t: scorer, n: scorerPlayer ? scorerPlayer.n : 0, min: Math.max(1, minute(s)), og: s.lastTouch === end ? 1 : 0, pen: s.pk ? 1 : 0 });
     s.phase = 'goal'; s.timer = 150; s.kickoffTeam = end; s.pk = null;
     s.ownerTeam = s.ownerIdx = -1;

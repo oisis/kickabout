@@ -39,6 +39,7 @@ export class App {
   }
 
   menu() {
+    this.run?.spec.net?.close(); // leaving a finished online match must free the opponent too
     this.run = null;
     this.viewer = null;
     crowdLevel(0);
