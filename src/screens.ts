@@ -4,7 +4,7 @@ import { TEAMS, POS, LEAGUE_COUNTRIES, leagueLabel, type TeamDef, team, rating, 
 import { type MatchRun, type Side, makeSpec, choosePitch } from './match.ts';
 import { type Options, options, saveOptions, minuteOptions, MATCH_MINUTES, highlights, deleteHighlight, addHighlights, download, upload, customTeams, customTactics, type Highlight } from './store.ts';
 import { statRows } from './render.ts';
-import { Net, savedServer, serverUrl, siteUrl } from './net.ts';
+import { Net, savedServer, serverUrl, siteUrl, liveServer } from './net.ts';
 import { h, show, title, btn, row, back, select, toggle, input, table, toast } from './ui.ts';
 import type { App } from './main.ts';
 import { compMenu } from './compScreens.ts';
@@ -236,7 +236,7 @@ export function message(text: string, done: () => void) {
 
 function online(app: App) {
   const o = options();
-  const state = { address: savedServer(), team: TEAMS[0].id, club: false, voice: false, mode: 'quick', code: '', minutes: o.minutes, pitch: o.pitch, extraTime: o.extraTime, penalties: o.penalties };
+  const state = { address: savedServer(), team: TEAMS[0].id, club: false, voice: false, hidden: false, spectate: false, mode: 'quick', code: '', minutes: o.minutes, pitch: o.pitch, extraTime: o.extraTime, penalties: o.penalties };
   const draw = () => show(
     title(tr('Gra online'), tr('Obaj gracze łączą się z tym samym serwerem (scripts/start-server.sh)')),
     input(tr('Adres serwera'), state.address, (v) => { state.address = v; }, { placeholder: '192.168.1.10:8787', autocapitalize: 'off' }),
@@ -244,6 +244,9 @@ function online(app: App) {
     toggle(tr('Zagraj moim klubem online (nagrody, wymaga konta)'), state.club, (v) => { state.club = v; }),
     // Voice goes peer to peer (addresses are visible to the other phone): friends in a private room only.
     state.mode !== 'quick' && toggle(tr('Czat głosowy (gdy znajomy też go włączy)'), state.voice, (v) => { state.voice = v; }),
+    // Fan zone on the website: quick matches are shown unless a player opts out; rooms only if the host allows it.
+    state.mode === 'quick' && toggle(tr('Nie pokazuj mojego meczu w strefie kibica'), state.hidden, (v) => { state.hidden = v; }),
+    state.mode === 'host' && toggle(tr('Pozwól oglądać w strefie kibica'), state.spectate, (v) => { state.spectate = v; }),
     select(tr('Tryb'), state.mode, [['quick', tr('Szybka gra — losowy przeciwnik')], ['host', tr('Załóż pokój dla znajomego')], ['join', tr('Dołącz do pokoju znajomego')]], (v) => { state.mode = v; draw(); }),
     state.mode === 'join' && input(tr('Kod pokoju'), state.code, (v) => { state.code = v.toUpperCase(); }, { maxLength: 4, autocapitalize: 'characters' }),
     // Both players propose a length; when they differ the server draws one of the two.
@@ -256,13 +259,25 @@ function online(app: App) {
       if (!state.address.trim()) return toast(tr('Podaj adres serwera'));
       if (state.mode === 'join' && state.code.length !== 4) return toast(tr('Kod pokoju ma 4 litery'));
       // With `club` the server swaps in the player's online club (signed in by cookie or the app's token).
-      const config = { team: team(state.team, customTeams()), club: state.club, voice: state.mode !== 'quick' && state.voice, minutes: state.minutes, pitch: choosePitch(state.pitch), extraTime: state.extraTime, penalties: state.penalties };
+      const config = { team: team(state.team, customTeams()), club: state.club, voice: state.mode !== 'quick' && state.voice, hidden: state.hidden, spectate: state.mode === 'host' && state.spectate, minutes: state.minutes, pitch: choosePitch(state.pitch), extraTime: state.extraTime, penalties: state.penalties };
       const net = new Net(serverUrl(state.address), { room: state.mode === 'host' ? 'new' : state.mode === 'join' ? state.code : undefined, config, token: token() || undefined });
       net.onStart = () => { app.startMatch(onlineSpec(net)); app.startVoice(net); };
       app.startMatch({ ...makeSpec({ team: config.team, human: 1 }, { team: TEAMS[1], human: 0 }, o), net });
     }, 'primary')),
   );
   draw();
+}
+
+/** Fan zone: watch a live match. The server sends its copy of the state, then the players' inputs. */
+export function watchMatch(app: App, id: string) {
+  const net = new Net(liveServer(), { watch: id, config: {} });
+  net.onStart = () => {
+    const spec = onlineSpec(net);
+    spec.watch = true;
+    app.startMatch(spec, () => show(title(tr('Koniec meczu')), h('p', { className: 'sub' }, tr('Wybierz kolejny mecz z listy w strefie kibica.'))));
+    app.run!.s = structuredClone(net.state!); // join where the match is now, not at kick-off
+  };
+  app.startMatch({ ...makeSpec({ team: TEAMS[0], human: 0 }, { team: TEAMS[1], human: 0 }, options()), net });
 }
 
 /** Both peers must build the same match from the server's config: presets only, validated input. */

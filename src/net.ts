@@ -4,7 +4,7 @@ import type { State } from './sim.ts';
 import { t } from './i18n.ts';
 
 /** Server disconnect reasons (codes) to translatable texts. */
-const BYE: Record<string, string> = { 'opponent-left': 'Przeciwnik rozłączony', lag: 'Zbyt duże opóźnienie', desync: 'Rozsynchronizowano — mecz przerwany', 'no-room': 'Nie ma pokoju {0}', unknown: 'Koniec gry' };
+const BYE: Record<string, string> = { 'opponent-left': 'Przeciwnik rozłączony', lag: 'Zbyt duże opóźnienie', desync: 'Rozsynchronizowano — mecz przerwany', 'no-room': 'Nie ma pokoju {0}', unknown: 'Koniec gry', end: 'Koniec meczu', 'no-match': 'Ten mecz już się skończył', full: 'Za dużo kibiców — spróbuj za chwilę', 'player-left': 'Gracz opuścił mecz' };
 
 export class Net {
   status: 'connecting' | 'waiting' | 'room' | 'playing' | 'closed' = 'connecting';
@@ -17,20 +17,26 @@ export class Net {
   frames = new Map<number, [number, number]>();
   reward: number | null = null; // prize money the server paid after a club match
   voice: { iceServers: RTCIceServer[]; initiator: boolean } | null = null; // both players of a room chose voice chat
+  watching = false; // a spectator in the fan zone: receives the match, sends nothing
+  state: State | null = null; // spectators start from the server's copy of the match
+  spectators = 0;
   onStart = () => {};
   onSignal: (d: any) => void = () => {}; // WebRTC signalling from the other player (voice.ts)
   private ws: WebSocket;
 
-  /** room: undefined = quick match, 'new' = create a private room, or a room code to join; token: the app's account (club matches). */
-  constructor(url: string, join: { room?: string; config: Record<string, unknown>; token?: string } = { config: {} }) {
+  /**
+   * room: undefined = quick match, 'new' = create a private room, or a room code to join; token: the app's
+   * account (club matches); watch: a live match id to watch as a spectator instead of playing.
+   */
+  constructor(url: string, join: { room?: string; config: Record<string, unknown>; token?: string; watch?: string } = { config: {} }) {
     this.ws = new WebSocket(url);
-    this.ws.onopen = () => this.send({ t: 'join', ...join });
+    this.ws.onopen = () => this.send(join.watch ? { t: 'watch', id: join.watch } : { t: 'join', ...join });
     this.ws.onmessage = (e) => { try { this.receive(JSON.parse(String(e.data))); } catch { /* ignore malformed */ } };
     this.ws.onerror = () => { this.message ||= t('Nie można połączyć z serwerem'); };
     this.ws.onclose = () => { this.message ||= t('Połączenie zerwane'); this.status = 'closed'; };
   }
 
-  private receive(m: { t: string; seed?: number; side?: number; delay?: number; k?: number; b?: number[]; why?: string; room?: string; code?: string; config?: Record<string, unknown>; amount?: number; voice?: { iceServers: RTCIceServer[]; initiator: boolean } | null; d?: unknown }) {
+  private receive(m: { t: string; seed?: number; side?: number; delay?: number; k?: number; b?: number[]; why?: string; room?: string; code?: string; config?: Record<string, unknown>; amount?: number; voice?: { iceServers: RTCIceServer[]; initiator: boolean } | null; d?: unknown; state?: State; spectators?: number }) {
     if (m.t === 'wait') this.status = 'waiting';
     else if (m.t === 'room') { this.status = 'room'; this.room = String(m.code ?? ''); }
     else if (m.t === 'start') {
@@ -41,6 +47,15 @@ export class Net {
       for (let k = 0; k < this.delay; k++) this.input(k, 0);
       this.onStart();
     } else if (m.t === 'f' && Number.isInteger(m.k)) this.frames.set(m.k!, [m.b![0] & 0xffffff, m.b![1] & 0xffffff]); // controls + commands
+    else if (m.t === 'watch' && m.state) {
+      this.watching = true; this.status = 'playing'; this.delay = 12; // keeps ~0.2 s of frames in hand
+      this.config = m.config && typeof m.config === 'object' ? m.config : {};
+      this.state = m.state; this.spectators = m.spectators ?? 1;
+      this.onStart();
+    } else if (m.t === 'w' && Number.isInteger(m.k) && Array.isArray(m.b)) {
+      // A batch of frames for spectators: input word pairs from frame k on.
+      for (let i = 0; i < m.b.length / 2; i++) if (m.k! + i >= (this.state?.frame ?? 0)) this.frames.set(m.k! + i, [m.b[2 * i] & 0xffffff, m.b[2 * i + 1] & 0xffffff]);
+    }
     else if (m.t === 'reward') this.reward = Number(m.amount) || 0;
     else if (m.t === 'rtc' && m.d && typeof m.d === 'object') this.onSignal(m.d);
     else if (m.t === 'bye') { this.message = t(BYE[m.why ?? ''] ?? BYE.unknown, String(m.room ?? '')); this.status = 'closed'; }
@@ -50,11 +65,12 @@ export class Net {
     if (this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
   }
 
-  input(k: number, bits: number) { this.send({ t: 'in', k, b: bits }); }
+  input(k: number, bits: number) { if (!this.watching) this.send({ t: 'in', k, b: bits }); }
   signal(d: object) { this.send({ t: 'rtc', d }); }
 
   /** Lets the server detect diverged simulations. */
   check(k: number, s: State) {
+    if (this.watching) return;
     const str = JSON.stringify(s);
     let h = 0x811c9dc5;
     for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 0x01000193);
@@ -88,6 +104,9 @@ export function serverUrl(address: string): string {
   try { localStorage.setItem('server', v); } catch { /* storage unavailable */ }
   return /^wss?:\/\//.test(v) ? v : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${v}`;
 }
+
+/** The website's own match server (the fan zone ignores an address typed for playing). */
+export const liveServer = (): string => site().ws || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 
 /** Base URL of the HTTP API: the website's /api, its API subdomain, or (in the app) the build-time address. */
 export function apiBase(): string {

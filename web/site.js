@@ -1,7 +1,8 @@
 // Shared by every page: Polish/English texts (data-i18n attributes) and the signed-in state in the header.
 const TEXT = {
   en: {
-    nav_play: 'Play', nav_download: 'Download', nav_account: 'Account', nav_signin: 'Sign in',
+    nav_play: 'Play', nav_live: 'Fan zone', nav_download: 'Download',
+    live_title: 'Fan zone', live_lead: 'Online matches being played right now. Pick one to watch — players can hide their match.', live_empty: 'No live matches right now. Start one in the game: Online play.', live_pick: 'Pick a match from the list', live_end: 'Full time', live_half: 'Half time', kind_quick: 'Quick match', kind_room: 'Friends\' room', kind_club: 'Club match', nav_account: 'Account', nav_signin: 'Sign in',
     hero_title: 'Arcade football. <span>11 a side.</span>',
     hero_lead: 'Top-down, fast and simple to pick up: run, pass, shoot and slide. Leagues, cups, a 20-season career and online matches with friends.',
     play_now: '▶ Play in the browser', get_android: '⬇ Download for Android',
@@ -10,8 +11,10 @@ const TEXT = {
     f2_t: 'Leagues and career', f2_p: '384 clubs in 8 countries and 40 national teams. Promotion, transfers and finances.',
     f3_t: 'Online with friends', f3_p: 'Quick match or a private room with a 4-letter code. Deterministic lockstep keeps both phones identical.',
     f4_t: 'Editors', f4_p: 'Rename teams, recolour kits, tune players and drag your own tactics.',
-    f5_t: 'Touch, keys, gamepad', f5_p: 'Stick on the left, KICK on the right. Two players on one keyboard.',
+    f5_t: 'Touch, keys, gamepad', f5_p: 'Stick on the left, PASS and SHOOT on the right. Two players on one keyboard, portrait or landscape.',
     f6_t: 'Seven languages', f6_p: 'English, Polish, French, German, Italian, Spanish and Dutch.',
+    f7_t: 'Live voice chat', f7_p: 'Talk to your friend during a match in a private room — when both of you switch it on. Phone to phone, no lag.',
+    f8_t: 'Fan zone', f8_p: 'Watch online matches live in your browser and switch between them whenever you like.', f8_link: 'Open the fan zone →',
     dl_title: 'Android app', dl_lead: 'Free APK, no ads, no tracking. Android 7.0 or newer.',
     dl_1: 'Download the file on your phone.', dl_2: 'Open it and allow installing apps from this source when Android asks.',
     dl_3: 'Start Kickabout. For online play the server address is already filled in.',
@@ -32,7 +35,8 @@ const TEXT = {
     since: 'since',
   },
   pl: {
-    nav_play: 'Graj', nav_download: 'Pobierz', nav_account: 'Konto', nav_signin: 'Zaloguj',
+    nav_play: 'Graj', nav_live: 'Strefa kibica', nav_download: 'Pobierz',
+    live_title: 'Strefa kibica', live_lead: 'Mecze online rozgrywane w tej chwili. Wybierz, który chcesz oglądać — gracze mogą ukryć swój mecz.', live_empty: 'Teraz nikt nie gra. Rozpocznij mecz w grze: Gra online.', live_pick: 'Wybierz mecz z listy', live_end: 'Koniec', live_half: 'Przerwa', kind_quick: 'Szybka gra', kind_room: 'Pokój znajomych', kind_club: 'Mecz klubów', nav_account: 'Konto', nav_signin: 'Zaloguj',
     hero_title: 'Zręcznościowa piłka. <span>11 na 11.</span>',
     hero_lead: 'Widok z góry, szybka i prosta: biegnij, podawaj, strzelaj i rób wślizgi. Ligi, puchary, kariera na 20 sezonów i mecze online ze znajomymi.',
     play_now: '▶ Graj w przeglądarce', get_android: '⬇ Pobierz na Androida',
@@ -41,8 +45,10 @@ const TEXT = {
     f2_t: 'Ligi i kariera', f2_p: '384 kluby w 8 krajach i 40 reprezentacji. Awanse, transfery i finanse.',
     f3_t: 'Online ze znajomymi', f3_p: 'Szybka gra albo pokój z 4-literowym kodem. Deterministyczna symulacja trzyma oba telefony w zgodzie.',
     f4_t: 'Edytory', f4_p: 'Zmieniaj nazwy drużyn, kolory strojów, umiejętności i przeciągaj własne taktyki.',
-    f5_t: 'Dotyk, klawiatura, pad', f5_p: 'Drążek po lewej, KOP po prawej. Dwóch graczy na jednej klawiaturze.',
+    f5_t: 'Dotyk, klawiatura, pad', f5_p: 'Drążek po lewej, PODANIE i STRZAŁ po prawej. Dwóch graczy na jednej klawiaturze, w pionie i w poziomie.',
     f6_t: 'Siedem języków', f6_p: 'Polski, angielski, francuski, niemiecki, włoski, hiszpański i niderlandzki.',
+    f7_t: 'Rozmowy na żywo', f7_p: 'Rozmawiaj ze znajomym w czasie meczu w prywatnym pokoju — gdy obaj to włączycie. Bezpośrednio między telefonami, bez lagów.',
+    f8_t: 'Strefa kibica', f8_p: 'Oglądaj mecze online na żywo w przeglądarce i przełączaj się między nimi, kiedy chcesz.', f8_link: 'Otwórz strefę kibica →',
     dl_title: 'Aplikacja na Androida', dl_lead: 'Darmowy APK, bez reklam i śledzenia. Android 7.0 lub nowszy.',
     dl_1: 'Pobierz plik na telefonie.', dl_2: 'Otwórz go i zezwól na instalację z tego źródła, gdy Android zapyta.',
     dl_3: 'Uruchom Kickabout. Adres serwera do gry online jest już wpisany.',

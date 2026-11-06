@@ -277,7 +277,7 @@ async function league(d: Device) {
   await d.tap('Menu').catch(() => {});
 }
 
-async function goOnline(d: Device, mode: 'quick' | 'host' | 'join', teamName: string, code = '', extra = false, club = false, voice = false) {
+async function goOnline(d: Device, mode: 'quick' | 'host' | 'join', teamName: string, code = '', extra = false, club = false, voice = false, spectate = false) {
   for (let i = 0; i < 3 && !(await d.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await d.tap('← Wstecz').catch(() => d.tap('Menu'));
   await d.tap('Gra online');
   await d.type('Adres serwera', SERVER);
@@ -285,6 +285,7 @@ async function goOnline(d: Device, mode: 'quick' | 'host' | 'join', teamName: st
   await d.choose('Tryb', d.t({ quick: 'Szybka gra — losowy przeciwnik', host: 'Załóż pokój dla znajomego', join: 'Dołącz do pokoju znajomego' }[mode]), true);
   await d.toggle('Zagraj moim klubem online (nagrody, wymaga konta)', club);
   if (mode !== 'quick') await d.toggle('Czat głosowy (gdy znajomy też go włączy)', voice);
+  if (mode === 'host') await d.toggle('Pozwól oglądać w strefie kibica', spectate);
   if (mode === 'join') await d.type('Kod pokoju', code.toLowerCase()); // typed lowercase, the field uppercases
   else { await d.choose('Murawa', d.t('Losowa'), true); await d.toggle('Dogrywka przy remisie', extra); await d.toggle('Rzuty karne przy remisie', extra); }
   d.snap(`online-${mode}`);
@@ -448,6 +449,31 @@ async function voicePhase(A: Device, B: Device) {
   check('10: leaving the match ends the call', await A.js<boolean>(`kickabout.app.voice === null`));
 }
 
+/** A room the website's fan zone may show; logs the match pace before and while fans watch. */
+async function fansPhase(A: Device, B: Device) {
+  log('11. Strefa kibica: pokój z pozwoleniem na oglądanie');
+  for (const d of [A, B]) for (let i = 0; i < 3 && !(await d.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await d.tap('← Wstecz').catch(() => {});
+  await goOnline(A, 'host', 'London Navigators', '', false, false, false, true);
+  await waitFor('11: room created', 15_000, async () => (await A.state()).status === 'room');
+  await goOnline(B, 'join', 'Leeds Sentinels', (await A.state()).room);
+  await waitFor('11: match starts', 20_000, async () => (await A.state()).status === 'playing' && (await B.state()).status === 'playing');
+  log('   MECZ NA ŻYWO — strefa kibica może oglądać');
+  const pace = async (label: string) => {
+    const f0 = await A.js<number>(`kickabout.state().frame`); await sleep(10_000);
+    const f1 = await A.js<number>(`kickabout.state().frame`);
+    log(`   tempo (${label}): ${f1 - f0} klatek w 10 s`);
+    return f1 - f0;
+  };
+  const stopA = startPlaying(A), stopB = startPlaying(B);
+  await sleep(5000);
+  const before = await pace('bez kibiców');
+  await sleep(Number(process.env.FANS_WAIT ?? 60) * 1000); // the browser joins as spectators meanwhile
+  const during = await pace('z kibicami');
+  check('11: the players\' pace does not drop while fans watch', during >= before * 0.95, `${before} → ${during} frames per 10 s`);
+  stopA(); stopB();
+  await bothFinish('kibice', A, B);
+}
+
 async function main() {
   execFileSync('mkdir', ['-p', SHOTS]);
   const A = new Device('A', SERIAL_A, 9401), B = new Device('B', SERIAL_B, 9402);
@@ -458,6 +484,7 @@ async function main() {
     await Promise.all([setOptions(A, 'pl', '5 min', false), setOptions(B, 'en', '5 min', false)]);
     if (phases.includes('club')) await clubPhase(A, B);
     if (phases.includes('voice')) await voicePhase(A, B);
+    if (phases.includes('fans')) await fansPhase(A, B);
     return finish();
   }
 

@@ -102,11 +102,11 @@ export class App {
     if (!run) return;
     run.update(dt);
     const s = run.s, net = run.spec.net;
-    if (s.paused && !run.replay && !this.pauseShown) { this.pauseShown = true; screens.pauseMenu(this, run); }
+    if (s.paused && !run.replay && !this.pauseShown && !run.spec.watch) { this.pauseShown = true; screens.pauseMenu(this, run); }
     if ((!s.paused || run.replay) && this.pauseShown) { this.pauseShown = false; show(); }
     if (s.phase === 'end' && !this.ended) {
       this.ended = true;
-      if (options().autoSaveHighlights && run.highlights.length) addHighlights(run.highlights);
+      if (options().autoSaveHighlights && run.highlights.length && !run.spec.watch) addHighlights(run.highlights);
       crowdLevel(0);
       setTimeout(() => this.run === run && screens.fullTime(this, run, () => (this.onEnd ? this.onEnd(s, run) : this.menu())), 1500);
     }
@@ -137,8 +137,10 @@ export class App {
     const net = run.spec.net;
     const overlay = !net || net.status === 'playing' || net.status === 'closed' ? ''
       : net.status === 'connecting' ? t('Łączenie z serwerem…') : net.status === 'room' ? t('Pokój {0} — podaj kod znajomemu', net.room) : t('Czekam na przeciwnika…');
+    const watch = !!run.spec.watch;
     render(ctx, r ? r.s : run.s, run.info, controls, {
-      humans: net ? [net.side === 0 ? 1 : 0, net.side === 1 ? 1 : 0] : run.spec.humans,
+      humans: watch ? [0, 0] : net ? [net.side === 0 ? 1 : 0, net.side === 1 ? 1 : 0] : run.spec.humans,
+      live: watch ? `${t('NA ŻYWO')}${run.s.paused ? ` • ${t('przerwa w grze')}` : ''}` : undefined,
       me: run.me, overlay, replay: r ? r.title : '',
       voice: this.voice && !r ? { muted: this.voice.muted, state: this.voice.state } : undefined,
     });
@@ -154,7 +156,7 @@ export class App {
 }
 
 const app = new App();
-controls.onPause = () => { if (app.run && app.run.s.phase !== 'end' && !app.run.replay) app.run.togglePause(); };
+controls.onPause = () => { if (app.run && app.run.s.phase !== 'end' && !app.run.replay && !app.run.spec.watch) app.run.togglePause(); };
 canvas.addEventListener('pointerdown', () => app.tap());
 
 let last = performance.now();
@@ -168,6 +170,9 @@ requestAnimationFrame(frame);
 app.menu();
 // The website's "My club" link opens the game on that screen.
 if (new URLSearchParams(location.search).has('club')) import('./clubScreens.ts').then((m) => m.clubMenu(app));
+// The website's fan zone plays a live match here (in its frame): ?watch=<match id>.
+const watchId = new URLSearchParams(location.search).get('watch');
+if (watchId) screens.watchMatch(app, watchId);
 
 // On-device test hook, only when opened with ?debug: live state and controls.
 if (new URLSearchParams(location.search).has('debug')) Object.assign(globalThis, { kickabout: { app, state: () => app.run?.s, controls } });

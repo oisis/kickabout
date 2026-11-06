@@ -8,7 +8,7 @@ import { type Controls, STICK_R, PAUSE_BTN, MIC_BTN, SHOT_BTN, PASS_BTN } from '
 import type { MatchInfo } from './store.ts';
 import { t, EVENT_TEXT } from './i18n.ts';
 
-export interface View { humans: number[]; me: number; overlay: string; replay: string; voice?: { muted: boolean; state: string } }
+export interface View { humans: number[]; me: number; overlay: string; replay: string; voice?: { muted: boolean; state: string }; live?: string }
 
 // Grass stripe colours per pitch surface (see PITCHES).
 const GRASS = [['#a7c4c9', '#b7d2d6'], ['#5b6b2f', '#66763a'], ['#256f33', '#2b7a39'], ['#2c8035', '#328a3c'], ['#2a8235', '#2f8f3a'], ['#4f8a2c', '#588f33'], ['#6b8c35', '#76963d']];
@@ -36,7 +36,7 @@ export function render(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo,
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   hud(ctx, s, info, cw, ch, dpr, view);
-  if (c.touch && !view.overlay && !view.replay) touchControls(ctx, c, cw, ch, dpr);
+  if (c.touch && !view.overlay && !view.replay && !view.live) touchControls(ctx, c, cw, ch, dpr);
 }
 
 function pitch(ctx: CanvasRenderingContext2D, surface: number) {
@@ -250,12 +250,14 @@ function hud(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, cw: numbe
   text(ctx, info.shorts[1], u * 4.1, u * 1.05, u * 0.75, info.kits[1].shirt);
   text(ctx, clock, u * 6.1, u * 1.05, u * 0.65);
 
-  // Pause button (top right)
+  // Pause button (top right); spectators cannot pause
   const px = cw + PAUSE_BTN.x * dpr, py = PAUSE_BTN.y * dpr, pr = PAUSE_BTN.r * dpr;
-  ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(px - pr * 0.35, py - pr * 0.4, pr * 0.22, pr * 0.8);
-  ctx.fillRect(px + pr * 0.13, py - pr * 0.4, pr * 0.22, pr * 0.8);
+  if (!view.live) {
+    ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(px - pr * 0.35, py - pr * 0.4, pr * 0.22, pr * 0.8);
+    ctx.fillRect(px + pr * 0.13, py - pr * 0.4, pr * 0.22, pr * 0.8);
+  }
   if (view.voice) mic(ctx, cw + MIC_BTN.x * dpr, MIC_BTN.y * dpr, MIC_BTN.r * dpr, view.voice);
 
   ctx.textAlign = 'center';
@@ -271,7 +273,10 @@ function hud(ctx: CanvasRenderingContext2D, s: State, info: MatchInfo, cw: numbe
     text(ctx, t('Dotknij, aby wrócić do menu'), cw / 2, ch * 0.55, u * 0.6);
     return;
   }
-  if (s.frame < 300 && s.period === 0) {
+  if (view.live) { // fan zone: a red LIVE badge instead of "you play"
+    ctx.textAlign = 'center';
+    text(ctx, `● ${view.live}`, cw / 2, ch - u * 0.9, u * 0.55, '#f87171');
+  } else if (s.frame < 300 && s.period === 0) {
     const name = info.names[view.me];
     text(ctx, s.sides[view.me] === -1 ? t('Grasz: {0} (atak w górę)', name) : t('Grasz: {0} (atak w dół)', name), cw / 2, ch * 0.2, u * 0.6);
     // Club sponsors are announced before kick-off.

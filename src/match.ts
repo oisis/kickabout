@@ -24,6 +24,8 @@ export interface MatchSpec {
   autoReplay: boolean;
   /** Keep every input word of the home side (a prize match the server replays to verify). */
   record?: boolean;
+  /** Fan zone: watching someone else's online match (no controls, no pause). */
+  watch?: boolean;
 }
 
 export class MatchRun {

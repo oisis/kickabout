@@ -137,6 +137,17 @@ Potem jedna z opcji:
 
 Murawę i zasady ustala założyciel pokoju (w szybkiej grze: gracz, który czekał pierwszy). Długość meczu proponują obaj gracze: gdy się różnią, serwer losuje jedną z dwóch. Opóźnienie sterowania wynosi 100 ms.
 
+### Strefa kibica
+
+- **Strona:** `/kibic.html` pokazuje mecze online rozgrywane w tej chwili (drużyny, wynik, minuta, rodzaj meczu, liczba oglądających). Kliknięcie meczu otwiera go w odtwarzaczu, czyli w grze w trybie oglądania (`/play/?watch=<id>`). Mecze można przełączać, a link z `#id` meczu da się komuś wysłać.
+- **Kto jest widoczny:**
+  - szybka gra domyślnie tak, chyba że któryś gracz zaznaczy „Nie pokazuj mojego meczu w strefie kibica”;
+  - prywatny pokój tylko wtedy, gdy gospodarz zaznaczy „Pozwól oglądać w strefie kibica”;
+  - kibice nie widzą nazw kont, adresów IP ani czatu głosowego.
+- **Jak działa:** serwer symuluje każdy mecz u siebie, z tych samych wejść co gracze. Kibic dostaje bieżący stan meczu (ok. 9 KB), a potem wejścia graczy w paczkach co 100 ms. Liczy mecz u siebie identycznie jak gracze i od razu wchodzi w trwający mecz (`server/live.ts`, `GET /api/live`).
+- **Bez lagów dla graczy:** gracze dostają każdą klatkę pierwsi, a kibice osobno, na zegarze. Kibic z zaległościami powyżej 256 KB jest rozłączany. Limity to 50 kibiców na mecz i 500 na serwer. Ping co 30 s usuwa martwe połączenia. W teście z kibicami tempo meczu na telefonach się nie zmieniło (600 → 602 klatek na 10 s).
+- **Koszt:** ok. 1 KB/s na kibica.
+
 ### Czat głosowy
 
 - **Gdzie:** tylko w prywatnym pokoju (ze znajomym z kodem) i tylko wtedy, gdy obaj gracze włączą „Czat głosowy”. W szybkiej grze z przypadkowym rywalem go nie ma.
