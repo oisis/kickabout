@@ -4,8 +4,9 @@
 # Versions: package.json is the single source (semantic versioning). Release with
 #   npm version minor   (or major / patch: bumps package.json + Helm chart, commits, tags v1.3.0)
 #   git push --follow-tags
-# Image tags: "latest" + "sha-<commit>" from main; "1.3.0", "1.3" and "1" from a v1.3.0 tag,
-# which also makes a GitHub Release with the APK.
+# Image tags always carry the app version from package.json (the Helm chart's appVersion):
+# "1.3.0" (+ "latest") from main; "1.3.0", "1.3" and "1" from a v1.3.0 tag, which also makes a
+# GitHub Release with the APK.
 #
 # Repository settings:
 #   variables  PUBLIC_URL                 site the APK talks to, e.g. https://kickabout.example.com
@@ -34,9 +35,12 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with: { node-version: 26, cache: npm }
-      - name: Tag matches package.json
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - name: One version everywhere (package.json, Helm chart, git tag)
+        run: |
+          v=$(node -p 'require("./package.json").version')
+          grep -qx "version: $v" deploy/helm/kickabout/Chart.yaml || { echo "::error::Chart.yaml version differs from package.json ($v)"; exit 1; }
+          grep -qx "appVersion: $v" deploy/helm/kickabout/Chart.yaml || { echo "::error::Chart.yaml appVersion differs from package.json ($v)"; exit 1; }
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then test "v$v" = "$GITHUB_REF_NAME" || { echo "::error::tag $GITHUB_REF_NAME does not match package.json $v"; exit 1; }; fi
       - run: npm ci
       - run: npx tsc
       - run: npm test
@@ -98,6 +102,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with: { name: apk, path: apk }
+      - id: version
+        run: echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -106,10 +112,10 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/kickabout-${{ matrix.image }}
+          flavor: latest=false
           tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
             type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix=sha-
-            type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
       - uses: docker/build-push-action@v6
