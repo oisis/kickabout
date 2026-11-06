@@ -10,11 +10,13 @@ Zręcznościowa piłka nożna z widokiem z góry, 11 na 11, na Androida (APK) i 
 <a href="docs/screenshots/android-3-club.png"><img src="docs/screenshots/thumbs/android-3-club.png" alt=""></a>
 <a href="docs/screenshots/android-4-market.png"><img src="docs/screenshots/thumbs/android-4-market.png" alt=""></a>
 <a href="docs/screenshots/android-5-club-match.png"><img src="docs/screenshots/thumbs/android-5-club-match.png" alt=""></a>
+<a href="docs/screenshots/www-3-game-club.png"><img src="docs/screenshots/thumbs/www-3-game-club.png" alt=""></a>
+<a href="docs/screenshots/www-4-game-kits.png"><img src="docs/screenshots/thumbs/www-4-game-kits.png" alt=""></a>
+</p>
+<p>
 <a href="docs/screenshots/android-6-landscape.png"><img src="docs/screenshots/thumbs/android-6-landscape.png" alt=""></a>
 <a href="docs/screenshots/www-1-home.png"><img src="docs/screenshots/thumbs/www-1-home.png" alt=""></a>
 <a href="docs/screenshots/www-2-account.png"><img src="docs/screenshots/thumbs/www-2-account.png" alt=""></a>
-<a href="docs/screenshots/www-3-game-club.png"><img src="docs/screenshots/thumbs/www-3-game-club.png" alt=""></a>
-<a href="docs/screenshots/www-4-game-kits.png"><img src="docs/screenshots/thumbs/www-4-game-kits.png" alt=""></a>
 </p>
 
 ## Co jest w grze
