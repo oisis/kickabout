@@ -26,17 +26,17 @@ class Device {
   constructor(name: string, serial: string, port: number) { this.name = name; this.serial = serial; this.port = port; }
 
   async launch(lang: string) {
-    adb(this.serial, 'shell', 'am', 'force-stop', 'pl.kopanka.game');
-    adb(this.serial, 'shell', 'am', 'start', '-n', 'pl.kopanka.game/.MainActivity');
+    adb(this.serial, 'shell', 'am', 'force-stop', 'com.kickabout.game');
+    adb(this.serial, 'shell', 'am', 'start', '-n', 'com.kickabout.game/.MainActivity');
     await sleep(3000);
-    const pid = adb(this.serial, 'shell', 'pidof', 'pl.kopanka.game').trim();
+    const pid = adb(this.serial, 'shell', 'pidof', 'com.kickabout.game').trim();
     try { adb(this.serial, 'forward', '--remove', `tcp:${this.port}`); } catch { /* not forwarded yet */ }
     adb(this.serial, 'forward', `tcp:${this.port}`, `localabstract:webview_devtools_remote_${pid}`);
     const pages = await (await fetch(`http://127.0.0.1:${this.port}/json`)).json();
     this.ws = new WebSocket(pages.find((p: { url: string }) => p.url.startsWith('http://localhost')).webSocketDebuggerUrl);
     await new Promise((r) => (this.ws.onopen = r));
     this.ws.onmessage = (e) => { const m = JSON.parse(String(e.data)); this.pending.get(m.id)?.(m); this.pending.delete(m.id); };
-    await this.js(`localStorage.setItem('kopanka.lang', '${lang}')`);
+    await this.js(`localStorage.setItem('kickabout.lang', '${lang}')`);
     await this.cdp('Page.navigate', { url: 'http://localhost/?debug' });
     await sleep(2500);
   }
@@ -70,9 +70,9 @@ class Device {
     })()`);
   }
 
-  state() { return this.js<any>(`(() => { const r = kopanka.app.run, s = r?.s, n = r?.spec.net; return s ? { phase: s.phase, frame: s.frame, tick: s.tick, score: s.score, paused: s.paused, subsLeft: s.subsLeft, period: s.period, so: s.so, status: n?.status, room: n?.room, side: n?.side, message: n?.message, names: r.info.names } : { status: n?.status }; })()`); }
+  state() { return this.js<any>(`(() => { const r = kickabout.app.run, s = r?.s, n = r?.spec.net; return s ? { phase: s.phase, frame: s.frame, tick: s.tick, score: s.score, paused: s.paused, subsLeft: s.subsLeft, period: s.period, so: s.so, status: n?.status, room: n?.room, side: n?.side, message: n?.message, names: r.info.names } : { status: n?.status }; })()`); }
   /** Simulation state with the per-device fields (frame counter after full time, last input) removed. */
-  fingerprint() { return this.js<string>(`JSON.stringify({ ...kopanka.app.run.s, frame: 0, prevInput: [0, 0], eventFrame: 0 })`).then((j) => createHash('sha256').update(j).digest('hex').slice(0, 16)); }
+  fingerprint() { return this.js<string>(`JSON.stringify({ ...kickabout.app.run.s, frame: 0, prevInput: [0, 0], eventFrame: 0 })`).then((j) => createHash('sha256').update(j).digest('hex').slice(0, 16)); }
 }
 
 /** A thumb on the stick and occasional kicks: realistic, varied input for one device. */
@@ -124,7 +124,7 @@ async function main() {
   const A = new Device('A', SERIAL_A, 9401), B = new Device('B', SERIAL_B, 9402);
   await A.launch('pl');
   await B.launch('de');
-  const shots = '/tmp/kopanka-e2e';
+  const shots = '/tmp/kickabout-e2e';
   execFileSync('mkdir', ['-p', shots]);
 
   // 1. Private room, mixed languages; pause from A, resume from B, a substitution by B.
@@ -183,7 +183,7 @@ async function main() {
   await waitFor('3: match starts on both', 20_000, async () => (await A.state()).status === 'playing' && (await B.state()).status === 'playing');
   const stop3 = startPlaying(B);
   await sleep(30_000);
-  adb(SERIAL_A, 'shell', 'am', 'force-stop', 'pl.kopanka.game');
+  adb(SERIAL_A, 'shell', 'am', 'force-stop', 'com.kickabout.game');
   const left = await waitFor('3: B learns the opponent left', 10_000, async () => (await B.state()).status === 'closed');
   stop3();
   const msg = (await B.state()).message;

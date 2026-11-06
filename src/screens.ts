@@ -4,7 +4,7 @@ import { TEAMS, POS, LEAGUE_COUNTRIES, leagueLabel, type TeamDef, team, rating, 
 import { type MatchRun, type Side, makeSpec, choosePitch } from './match.ts';
 import { type Options, options, saveOptions, highlights, deleteHighlight, addHighlights, download, upload, customTeams, customTactics, type Highlight } from './store.ts';
 import { statRows } from './render.ts';
-import { Net, savedServer, serverUrl } from './net.ts';
+import { Net, savedServer, serverUrl, siteUrl } from './net.ts';
 import { h, show, title, btn, row, back, select, toggle, input, table, toast } from './ui.ts';
 import type { App } from './main.ts';
 import { compMenu } from './compScreens.ts';
@@ -14,7 +14,7 @@ import { t as tr, lang, setLang, LANGS } from './i18n.ts';
 
 export function mainMenu(app: App) {
   show(
-    h('div', { className: 'logo' }, tr('KOPANKA')),
+    h('div', { className: 'logo' }, 'KICKABOUT'),
     h('nav', {},
       btn(tr('Mecz towarzyski'), () => friendly(app), 'big'),
       btn(tr('Rozgrywki'), () => compMenu(app), 'big'),
@@ -23,6 +23,8 @@ export function mainMenu(app: App) {
       btn(tr('Gra online'), () => online(app), 'big'),
       btn(tr('Najlepsze momenty'), () => highlightsScreen(app)),
       btn(tr('Opcje'), () => optionsScreen(app)),
+      // The app opens it in the system browser (Capacitor hands off external URLs).
+      siteUrl() && btn(tr('Strona www i konto'), () => { location.href = siteUrl(); }, 'ghost'),
     ),
     h('p', { className: 'hint' }, tr('Dotyk: lewa strona – bieg, prawa – podanie/strzał (przytrzymaj = mocniej), bez piłki – wślizg. Klawiatura: strzałki + spacja (gracz 2: WASD + F). Pad: drążek + A, Start = pauza.')),
   );
@@ -199,7 +201,7 @@ export function highlightsScreen(app: App) {
       btn('✕', () => { deleteHighlight(i); highlightsScreen(app); }, 'ghost'),
     ))),
     row(
-      list.length > 0 && btn(tr('Eksportuj'), () => download('kopanka-momenty.json', list), 'ghost'),
+      list.length > 0 && btn(tr('Eksportuj'), () => download('kickabout-highlights.json', list), 'ghost'),
       btn(tr('Importuj'), async () => {
         try {
           const data = await upload();

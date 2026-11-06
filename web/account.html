@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kickabout — account</title>
+  <meta name="theme-color" content="#14532d" />
+  <link rel="icon" href="/play/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/site.css" />
+  <script type="module" src="/site.js"></script>
+  <script type="module" src="/account.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="/">KICKABOUT</a>
+      <nav>
+        <a href="/play/" data-i18n="nav_play">Play</a>
+        <a href="/#download" class="hide-sm" data-i18n="nav_download">Download</a>
+        <a href="/account.html" id="account-link" data-i18n="nav_signin">Sign in</a>
+        <select class="lang" aria-label="Language"><option value="en">EN</option><option value="pl">PL</option></select>
+      </nav>
+    </div>
+  </header>
+
+  <main class="account">
+    <div class="notice" id="notice" hidden role="status"></div>
+
+    <!-- Signed out -->
+    <div id="signin" hidden>
+      <h1 data-i18n="acc_signin_title">Sign in</h1>
+      <p class="muted" data-i18n="acc_signin_lead"></p>
+      <div class="card providers" id="providers"></div>
+    </div>
+
+    <!-- Signed in -->
+    <div id="me" hidden>
+      <h1 data-i18n="acc_title">Your account</h1>
+      <div class="card profile"><img id="avatar" alt="" /><div><div class="name" id="name"></div><div class="muted" id="email"></div></div></div>
+
+      <div class="card">
+        <h3 data-i18n="acc_name">Display name</h3>
+        <form class="inline" id="rename"><input type="text" id="name-input" maxlength="40" required autocomplete="nickname" /><button class="btn primary" data-i18n="save">Save</button></form>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="acc_linked">Sign-in methods</h3>
+        <ul class="rows" id="identities"></ul>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="acc_sessions">Signed-in devices</h3>
+        <ul class="rows" id="sessions"></ul>
+        <div class="cta"><button class="btn ghost" id="logout-others" data-i18n="signout_others"></button><button class="btn" id="logout" data-i18n="signout"></button></div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="danger">Delete account</h3>
+        <p class="muted" data-i18n="danger_lead"></p>
+        <div class="cta"><button class="btn danger" id="delete" data-i18n="delete"></button></div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

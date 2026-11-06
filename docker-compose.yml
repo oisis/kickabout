@@ -1,0 +1,23 @@
+# Local stack: website on http://localhost:8080 (game at /play/), API behind it.
+# OAuth: put GOOGLE_CLIENT_ID/SECRET and GITHUB_CLIENT_ID/SECRET in .env (see README).
+services:
+  api:
+    build: { context: ., dockerfile: docker/api.Dockerfile }
+    image: kickabout-api
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+      DEV_LOGIN: ${DEV_LOGIN:-1}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+    volumes: [api-data:/data]
+    ports: ["8787:8787"] # direct access for the Android app on the LAN
+  web:
+    build: { context: ., dockerfile: docker/web.Dockerfile }
+    image: kickabout-web
+    environment: { API_UPSTREAM: "api:8787" }
+    ports: ["8080:8080"]
+    depends_on: [api]
+volumes:
+  api-data:

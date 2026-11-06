@@ -60,14 +60,18 @@ export class Net {
   }
 }
 
-/** Last used server address, or this page's host when served by the game server. */
+/** The Android app is served from http://localhost without a port. */
+const inApp = () => location.hostname === 'localhost' && !location.port;
+
+/** Last used server address; otherwise the website's own /ws (proxied to the API), or the app's build-time default. */
 export function savedServer(): string {
   let saved = '';
   try { saved = localStorage.getItem('server') ?? ''; } catch { /* storage unavailable */ }
-  // The Android app is served from http://localhost without a port; the game server always has one.
-  const servedByGameServer = location.protocol.startsWith('http') && !!location.port;
-  return saved || (servedByGameServer ? location.host : '');
+  return saved || (inApp() ? import.meta.env.VITE_SERVER ?? '' : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
 }
+
+/** The Kickabout website: the page above /play/, or (in the app) the address baked in at build time. */
+export const siteUrl = (): string => (inApp() ? import.meta.env.VITE_SITE ?? '' : new URL('../', location.href).href);
 
 /** Remember an address typed by the user and turn it into a WebSocket URL. */
 export function serverUrl(address: string): string {

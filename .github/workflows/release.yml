@@ -1,0 +1,118 @@
+# Tests, builds the Android APK and publishes the Docker images to GitHub Container Registry:
+#   ghcr.io/<owner>/kickabout-api   accounts + online matches
+#   ghcr.io/<owner>/kickabout-web   website, browser game and the APK download
+# Tags: "latest" + "sha-<commit>" from main, "1.2.3" + "1.2" from a v1.2.3 tag (which also makes a GitHub Release with the APK).
+#
+# Repository settings:
+#   variables  PUBLIC_URL                 site the APK talks to, e.g. https://kickabout.example.com
+#   secrets    ANDROID_KEYSTORE_BASE64    base64 of android/release.jks (without it the APK is debug-signed)
+#              ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+name: release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 26, cache: npm }
+      - run: npm ci
+      - run: npx tsc
+      - run: npm test
+
+  apk:
+    needs: test
+    runs-on: ubuntu-latest # has the Android SDK preinstalled
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 26, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21, cache: gradle }
+      - run: npm ci
+      - name: Release keystore
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE" ]; then echo "::warning::No ANDROID_KEYSTORE_BASE64 secret: the APK will be debug-signed"; exit 0; fi
+          echo "$KEYSTORE" | base64 -d > android/release.jks
+          printf 'storeFile=release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/keystore.properties
+      - name: Build APK
+        env:
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+        run: |
+          if [ -n "$PUBLIC_URL" ]; then
+            export VITE_SITE="${PUBLIC_URL%/}/"
+            export VITE_SERVER="$(echo "${PUBLIC_URL%/}" | sed 's#^https://#wss://#; s#^http://#ws://#')/ws"
+          fi
+          npm run apk
+          # Unsigned release builds cannot be installed: fall back to the debug build.
+          [ -f android/keystore.properties ] || cp android/app/build/outputs/apk/debug/app-debug.apk apk/kickabout.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: apk, path: apk/kickabout.apk, if-no-files-found: error }
+
+  images:
+    needs: apk
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write }
+    strategy:
+      matrix:
+        image: [api, web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: apk, path: apk }
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}' }
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/kickabout-${{ matrix.image }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/${{ matrix.image }}.Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  github-release:
+    needs: images
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: apk, path: apk }
+      - run: mv apk/kickabout.apk "apk/kickabout-${GITHUB_REF_NAME}.apk"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: apk/*.apk
+          generate_release_notes: true

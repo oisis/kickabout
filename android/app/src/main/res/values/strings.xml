@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Kopanka</string>
-    <string name="title_activity_main">Kopanka</string>
-    <string name="package_name">pl.kopanka.game</string>
-    <string name="custom_url_scheme">pl.kopanka.game</string>
+    <string name="app_name">Kickabout</string>
+    <string name="title_activity_main">Kickabout</string>
+    <string name="package_name">com.kickabout.game</string>
+    <string name="custom_url_scheme">com.kickabout.game</string>
 </resources>

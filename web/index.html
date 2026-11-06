@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kickabout — arcade football</title>
+  <meta name="description" content="Kickabout: top-down 11-a-side arcade football with leagues, career and online play. Play in the browser or download for Android." />
+  <meta name="theme-color" content="#14532d" />
+  <link rel="icon" href="/play/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/site.css" />
+  <script type="module" src="/site.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="/">KICKABOUT</a>
+      <nav>
+        <a href="/play/" data-i18n="nav_play">Play</a>
+        <a href="#download" class="hide-sm" data-i18n="nav_download">Download</a>
+        <a href="/account.html" id="account-link" data-i18n="nav_signin">Sign in</a>
+        <select class="lang" aria-label="Language"><option value="en">EN</option><option value="pl">PL</option></select>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div class="wrap">
+        <div>
+          <h1 data-i18n="hero_title">Arcade football. <span>11 a side.</span></h1>
+          <p data-i18n="hero_lead"></p>
+          <div class="cta">
+            <a class="btn primary" href="/play/" data-i18n="play_now">▶ Play in the browser</a>
+            <a class="btn ghost" href="#download" data-i18n="get_android">⬇ Download for Android</a>
+          </div>
+        </div>
+        <div class="phone"><img src="/img/screenshot.png" alt="Kickabout match on a phone" width="412" height="915" /></div>
+      </div>
+    </div>
+
+    <section>
+      <div class="wrap">
+        <h2 data-i18n="features">What is inside</h2>
+        <div class="grid">
+          <div class="card"><div class="icon">⚽</div><h3 data-i18n="f1_t"></h3><p data-i18n="f1_p"></p></div>
+          <div class="card"><div class="icon">🏆</div><h3 data-i18n="f2_t"></h3><p data-i18n="f2_p"></p></div>
+          <div class="card"><div class="icon">🌐</div><h3 data-i18n="f3_t"></h3><p data-i18n="f3_p"></p></div>
+          <div class="card"><div class="icon">✏️</div><h3 data-i18n="f4_t"></h3><p data-i18n="f4_p"></p></div>
+          <div class="card"><div class="icon">🎮</div><h3 data-i18n="f5_t"></h3><p data-i18n="f5_p"></p></div>
+          <div class="card"><div class="icon">🗣️</div><h3 data-i18n="f6_t"></h3><p data-i18n="f6_p"></p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="download" id="download">
+      <div class="wrap">
+        <h2 data-i18n="dl_title">Android app</h2>
+        <p class="muted" data-i18n="dl_lead"></p>
+        <ol>
+          <li data-i18n="dl_1"></li>
+          <li data-i18n="dl_2"></li>
+          <li data-i18n="dl_3"></li>
+        </ol>
+        <a class="btn primary" id="apk" href="/download/kickabout.apk" download data-i18n="dl_btn">⬇ Download APK</a>
+        <span class="muted" id="apk-size"></span>
+        <p class="muted" id="apk-missing" hidden data-i18n="dl_missing"></p>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="wrap" data-i18n="footer"></div></footer>
+
+  <script type="module">
+    // Show the APK size, or say it is missing, without downloading it.
+    const r = await fetch('/download/kickabout.apk', { method: 'HEAD' }).catch(() => null);
+    if (r?.ok) document.querySelector('#apk-size').textContent = ` ${(Number(r.headers.get('content-length')) / 1048576).toFixed(1)} MB`;
+    else { document.querySelector('#apk').hidden = true; document.querySelector('#apk-missing').hidden = false; }
+  </script>
+</body>
+</html>

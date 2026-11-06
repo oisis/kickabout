@@ -1,0 +1,46 @@
+# Public address of the site; OAuth redirect URIs are <publicUrl>/api/auth/{google,github}/callback.
+publicUrl: https://kickabout.example.com
+
+api:
+  image: { repository: ghcr.io/oisis/kickabout-api, tag: latest, pullPolicy: IfNotPresent }
+  # SQLite on a ReadWriteOnce volume: keep a single replica.
+  persistence:
+    size: 1Gi
+    storageClass: ""        # "" = cluster default
+  devLogin: false           # name-only sign-in for testing; never enable in production
+  # OAuth credentials. Either set them here (stored in a chart Secret) or name an existing
+  # Secret with keys GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET.
+  oauth:
+    existingSecret: ""
+    googleClientId: ""
+    googleClientSecret: ""
+    githubClientId: ""
+    githubClientSecret: ""
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 256Mi }
+
+# For private GHCR packages: a docker-registry Secret, e.g. kubectl create secret docker-registry ghcr-pull-secret ...
+imagePullSecrets: []   # - name: ghcr-pull-secret
+
+web:
+  image: { repository: ghcr.io/oisis/kickabout-web, tag: latest, pullPolicy: IfNotPresent }
+  replicas: 2
+  # NodePort exposes the site over plain HTTP on every node (e.g. phones on the LAN without the ingress).
+  service: { type: ClusterIP, nodePort: null }
+  resources:
+    requests: { cpu: 20m, memory: 32Mi }
+    limits: { memory: 128Mi }
+
+ingress:
+  enabled: true
+  className: nginx
+  host: kickabout.example.com
+  annotations:
+    # Online matches keep a WebSocket open for the whole game.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # cert-manager.io/cluster-issuer: letsencrypt
+  tls:
+    enabled: false
+    secretName: kickabout-tls

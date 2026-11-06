@@ -1,6 +1,6 @@
 {
-  "appId": "pl.kopanka.game",
-  "appName": "Kopanka",
+  "appId": "com.kickabout.game",
+  "appName": "Kickabout",
   "webDir": "dist",
   "server": { "androidScheme": "http", "cleartext": true },
   "plugins": { "SystemBars": { "insetsHandling": "disable" } }

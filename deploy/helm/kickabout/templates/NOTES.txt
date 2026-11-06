@@ -1,0 +1,10 @@
+Kickabout is deployed.
+
+  Website:  {{ .Values.publicUrl }}
+  Game:     {{ .Values.publicUrl }}/play/
+  APK:      {{ .Values.publicUrl }}/download/kickabout.apk
+  Android app server address: {{ .Values.publicUrl | replace "https://" "wss://" | replace "http://" "ws://" }}/ws
+
+OAuth redirect URIs to register:
+  {{ .Values.publicUrl }}/api/auth/google/callback
+  {{ .Values.publicUrl }}/api/auth/github/callback

@@ -1,0 +1,17 @@
+# Local K3s (Traefik ingress with its default certificate, images from the in-cluster registry):
+#   helm upgrade --install kickabout deploy/helm/kickabout -n kickabout --create-namespace -f deploy/k3s-local.yaml
+# Desktop browser: https://kickabout.localhost   Phones / emulators on the LAN: http://172.16.0.10:30080
+publicUrl: http://172.16.0.10:30080
+api:
+  image: { repository: 127.0.0.1:30500/kickabout-api, tag: dev, pullPolicy: Always }
+  devLogin: true
+web:
+  image: { repository: 127.0.0.1:30500/kickabout-web, tag: dev, pullPolicy: Always }
+  replicas: 1
+  service: { type: NodePort, nodePort: 30080 }
+ingress:
+  className: traefik
+  host: kickabout.localhost
+  annotations: # this Traefik redirects HTTP to HTTPS: serve on websecure with its default certificate
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"

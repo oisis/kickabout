@@ -143,7 +143,7 @@ requestAnimationFrame(frame);
 app.menu();
 
 // On-device test hook, only when opened with ?debug: live state and controls.
-if (new URLSearchParams(location.search).has('debug')) Object.assign(globalThis, { kopanka: { app, state: () => app.run?.s, controls } });
+if (new URLSearchParams(location.search).has('debug')) Object.assign(globalThis, { kickabout: { app, state: () => app.run?.s, controls } });
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator && location.hostname !== 'localhost') {
   navigator.serviceWorker.register('./sw.js').catch(() => {});

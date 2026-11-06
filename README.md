@@ -1,13 +1,15 @@
-# Kopanka
+# Kickabout
 
-Zręcznościowa piłka nożna z widokiem z góry, 11 na 11, na Androida (APK), przeglądarkę i PWA.
+Zręcznościowa piłka nożna z widokiem z góry, 11 na 11, na Androida (APK) i przeglądarkę, ze stroną www, kontami graczy i grą online.
+
+Repozytorium: `git@github.com:oisis/kickabout.git`.
 
 ```sh
 npm install
-npm run dev                     # gra w sieci lokalnej: http://<IP-komputera>:5173
-npm test                        # symulacja, rozgrywki, kariera, serwer (lockstep, pokoje)
-scripts/start-server.sh         # serwer gry online (port 8787, PORT=… zmienia)
-ANDROID_HOME=~/Android/Sdk npm run apk   # APK debug i release
+npm run dev                         # sama gra: http://<IP-komputera>:5173
+npm test                            # symulacja, rozgrywki, kariera, serwer, konta
+docker compose up --build           # strona + gra + API: http://localhost:8080 (gra pod /play/)
+ANDROID_HOME=~/Android/Sdk npm run apk   # APK debug i release → apk/kickabout.apk
 ```
 
 ## Co jest w grze
@@ -18,7 +20,7 @@ ANDROID_HOME=~/Android/Sdk npm run apk   # APK debug i release
   - 3 zmiany, faule, kartki, rzuty wolne i karne;
   - 7 rodzajów murawy (losowa albo zależna od pory roku);
   - zmiana stron, dogrywka, seria rzutów karnych;
-  - pauza, powtórki goli, statystyki, dźwięk.
+  - numery na koszulkach, pauza, powtórki goli, statystyki, dźwięk.
 - **Sterowanie:** dotyk (drążek po lewej, KOP po prawej, krótko = podanie, dłużej = strzał, bez piłki = wślizg), klawiatura (gracz 2: WASD + F) i pad.
 - **Tryby:**
   - mecz towarzyski (gracz kontra komputer, 2 graczy na jednym urządzeniu, komputer kontra komputer);
@@ -47,22 +49,101 @@ ANDROID_HOME=~/Android/Sdk npm run apk   # APK debug i release
 
 ## Architektura
 
-- `src/sim.ts`: cała logika meczu. Stan zawiera wyłącznie liczby całkowite, krok trwa 1/60 s, generator losowy ma ziarno. `step(state, [wejście0, wejście1])` to jedyna funkcja zmieniająca stan. Słowo wejścia niesie sterowanie (bity 0–4) oraz polecenia: pauzę, zmianę zawodnika i taktykę.
+Dwie usługi, każda z własnym obrazem Dockera:
+
+| Usługa | Katalog | Obraz | Co robi |
+|---|---|---|---|
+| **API** | `server/` | `ghcr.io/oisis/kickabout-api` | konta (`/api/…`, SQLite w `/data`) i mecze online (WebSocket). Gry nie symuluje: kojarzy graczy, rozsyła słowa wejścia, co 2 s porównuje sumy kontrolne stanu i przerywa mecz przy rozjeździe. |
+| **Strona** | `web/` + gra z `src/` | `ghcr.io/oisis/kickabout-web` | nginx: strona główna, panel konta, gra w przeglądarce pod `/play/`, APK pod `/download/kickabout.apk`. Przekazuje `/api/` i `/ws` do API (`API_UPSTREAM`). |
+
+Gra:
+- `src/sim.ts`: cała logika meczu. Stan zawiera wyłącznie liczby całkowite, krok trwa 1/60 s, generator losowy ma ziarno. `step(state, [wejście0, wejście1])` to jedyna funkcja zmieniająca stan.
 - `src/ai.ts`: komputer zwraca takie samo słowo wejścia jak gracz.
-- `src/competition.ts`, `src/career.ts`: czyste reguły rozgrywek i kariery. Zapisy są w JSON (localStorage, eksport do pliku).
-- `src/match.ts`: prowadzi mecz lokalnie albo online, nagrywa wejścia (powtórki odtwarzają symulację od migawki) i wyzwala dźwięki.
+- `src/competition.ts`, `src/career.ts`: czyste reguły rozgrywek i kariery. Zapisy są w JSON (localStorage `kickabout.*`, eksport do pliku; stare zapisy `kopanka.*` są przenoszone automatycznie).
+- `src/match.ts`: prowadzi mecz lokalnie albo online, nagrywa wejścia i wyzwala dźwięki.
 - `src/screens.ts`, `compScreens.ts`, `careerScreens.ts`, `editors.ts`: menu w HTML. `src/render.ts`: canvas.
-- `server/server.ts`: serwuje grę, kojarzy graczy w pary (szybka gra albo pokój z 4-literowym kodem) i rozsyła słowa wejścia. Gry nie symuluje. Co 2 s porównuje sumy kontrolne stanu obu graczy i kończy mecz przy rozjeździe.
+
+## Konta graczy
+
+Logowanie przez Google i GitHub (OAuth 2.0). Na stronie `/account.html` gracz zmienia nazwę, łączy i odłącza metody logowania, widzi zalogowane urządzenia, wylogowuje inne urządzenia i usuwa konto.
+
+Konfiguracja API (zmienne środowiskowe):
+
+| Zmienna | Znaczenie |
+|---|---|
+| `PUBLIC_URL` | publiczny adres strony, np. `https://kickabout.example.com` (adresy powrotu OAuth, ciasteczka `Secure` przy https) |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → OAuth client ID (Web), redirect URI: `<PUBLIC_URL>/api/auth/google/callback` |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | [GitHub → Settings → Developer settings → OAuth Apps](https://github.com/settings/developers), callback URL: `<PUBLIC_URL>/api/auth/github/callback` |
+| `DEV_LOGIN=1` | logowanie samym imieniem, tylko do testów |
+| `DB_PATH` | plik SQLite (w obrazie `/data/kickabout.db`) |
+
+Dostawca bez danych jest ukryty na stronie. Sesje to losowe tokeny w ciasteczku `HttpOnly; SameSite=Lax` (w bazie tylko ich skrót SHA-256), ważne 30 dni.
 
 ## Gra online
 
-Uruchom `scripts/start-server.sh`. W grze wybierz „Gra online”, wpisz adres `IP:8787` i swoją drużynę. Potem jedna z opcji:
+- **W przeglądarce** (`/play/`): adres serwera jest wpisany automatycznie (`/ws` tej samej strony).
+- **W aplikacji**: domyślny adres ustawia się przy budowaniu APK (`VITE_SERVER=wss://kickabout.example.com/ws`, a odnośnik „Strona www i konto” w menu: `VITE_SITE=https://kickabout.example.com/`). Można też wpisać `IP:8787` serwera API w sieci lokalnej (`scripts/start-server.sh`).
+
+Potem jedna z opcji:
 - **Szybka gra:** łączysz się z dowolnym czekającym graczem.
 - **Załóż pokój:** dostajesz kod dla znajomego.
 - **Dołącz:** wpisujesz kod pokoju znajomego.
 
-Długość meczu, murawę i zasady ustala założyciel pokoju. Opóźnienie sterowania wynosi 100 ms. Połączenie jest nieszyfrowane (`ws://`), więc serwer nadaje się do sieci domowej albo VPN (np. Tailscale), nie do otwartego internetu.
+Długość meczu, murawę i zasady ustala założyciel pokoju. Opóźnienie sterowania wynosi 100 ms.
+
+## Wdrożenie
+
+**Docker Compose:** `docker compose up --build` uruchamia oba obrazy. Dane OAuth wpisz do `.env` (zmienne z tabeli wyżej). Lokalnie domyślnie działa `DEV_LOGIN=1`.
+
+**Kubernetes (Helm):** chart `deploy/helm/kickabout`:
+
+```sh
+helm upgrade --install kickabout deploy/helm/kickabout -n kickabout --create-namespace \
+  --set publicUrl=https://kickabout.example.com --set ingress.host=kickabout.example.com \
+  --set api.oauth.githubClientId=… --set api.oauth.githubClientSecret=…
+```
+
+- API działa w jednej replice: SQLite na wolumenie RWO, a poczekalnia meczów jest w pamięci.
+- Wolumen zostaje po `helm uninstall`.
+- Dane OAuth można podać przez istniejący Secret (`api.oauth.existingSecret`).
+- Dla prywatnych pakietów GHCR ustaw `imagePullSecrets`.
+
+**Lokalny K3s:** `deploy/k3s-registry.yaml` (rejestr obrazów na `127.0.0.1:30500`) i `deploy/k3s-local.yaml`:
+
+```sh
+kubectl apply -f deploy/k3s-registry.yaml
+docker build -f docker/api.Dockerfile -t 127.0.0.1:30500/kickabout-api:dev . && docker push 127.0.0.1:30500/kickabout-api:dev
+docker build -f docker/web.Dockerfile -t 127.0.0.1:30500/kickabout-web:dev . && docker push 127.0.0.1:30500/kickabout-web:dev
+helm upgrade --install kickabout deploy/helm/kickabout -n kickabout --create-namespace -f deploy/k3s-local.yaml
+```
+
+Strona: `https://kickabout.localhost` (Traefik, certyfikat domyślny) oraz `http://172.16.0.10:30080` dla telefonów w sieci lokalnej.
+
+## CI/CD
+
+`.github/workflows/release.yml`:
+- każdy push i pull request: testy;
+- push na `main`: APK oraz obrazy `ghcr.io/oisis/kickabout-{api,web}` z tagami `latest` i `sha-<commit>` (amd64 + arm64);
+- tag `v1.2.3`: obrazy `1.2.3` i `1.2` oraz GitHub Release z APK.
+
+Ustawienia repozytorium:
+- zmienna `PUBLIC_URL`: adres, z którym łączy się APK;
+- sekrety `ANDROID_KEYSTORE_BASE64` (`base64 -w0 android/release.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. Bez nich APK jest podpisany kluczem debug.
+
+Pobieranie obrazów na serwerze:
+
+```sh
+docker login ghcr.io -u oisis   # token z uprawnieniem read:packages, jeśli pakiety są prywatne
+docker pull ghcr.io/oisis/kickabout-api:latest
+docker pull ghcr.io/oisis/kickabout-web:latest
+```
+
+## Testy na emulatorach
+
+`scripts/e2e-human.ts`: pełna sesja na dwóch emulatorach z APK debug. Przechodzi opcje, edytory drużyn i taktyk, mecz towarzyski, ligę, pokój online z pauzą i zmianą, szybką grę, najlepsze momenty i odnośnik do strony. Przykład: `SERVER=172.16.0.10:30080/ws node scripts/e2e-human.ts`.
 
 ## APK
 
-Wersja release jest podpisana kluczem `android/release.jks` (hasło w `android/keystore.properties`, oba poza gitem). **Zrób kopię zapasową klucza**: bez niego nie zainstalujesz aktualizacji na tę samą aplikację.
+- Identyfikator aplikacji to `com.kickabout.game`. Poprzednia `pl.kopanka.game` to osobna aplikacja: trzeba ją odinstalować.
+- Wersja release jest podpisana kluczem `android/release.jks` (hasło w `android/keystore.properties`, oba poza gitem).
+- **Zrób kopię zapasową klucza**: bez niego nie zainstalujesz aktualizacji na tę samą aplikację.

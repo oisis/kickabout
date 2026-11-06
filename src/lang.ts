@@ -1,6 +1,7 @@
 // Generated translations of the Polish UI texts (see i18n.ts). Keys must match t() calls exactly.
 export const DICT: Record<string, Record<string, string>> = {
   en: {
+    'Strona www i konto': 'Website and account',
     ' — oferty pracy!': ' — job offers!',
     ' • pierwszy mecz {0}:{1}': ' • first leg {0}:{1}',
     '1 drużyna': '1 team',
@@ -102,7 +103,6 @@ export const DICT: Record<string, Record<string, string>> = {
     'Jeszcze nikt nie strzelił gola.': 'Nobody has scored yet.',
     'Język / Language': 'Language',
     'KOP': 'KICK',
-    'KOPANKA': 'KOPANKA',
     'Kadra': 'Squad',
     'Kadra i sprzedaż': 'Squad and sales',
     'Kadra może liczyć najwyżej {0} zawodników.': 'Squad can have at most {0} players.',
@@ -368,6 +368,7 @@ export const DICT: Record<string, Record<string, string>> = {
     '🏆 Zwycięzca: {0}': '🏆 Winner: {0}',
   },
   fr: {
+    'Strona www i konto': 'Site web et compte',
     ' — oferty pracy!': ' — offres d\'emploi !',
     ' • pierwszy mecz {0}:{1}': ' • match aller {0}:{1}',
     '1 drużyna': '1 équipe',
@@ -469,7 +470,6 @@ export const DICT: Record<string, Record<string, string>> = {
     'Jeszcze nikt nie strzelił gola.': 'Personne n\'a encore marqué.',
     'Język / Language': 'Langue / Language',
     'KOP': 'TIR',
-    'KOPANKA': 'KOPANKA',
     'Kadra': 'Effectif',
     'Kadra i sprzedaż': 'Effectif et ventes',
     'Kadra może liczyć najwyżej {0} zawodników.': 'L\'effectif peut compter au plus {0} joueurs.',
@@ -735,6 +735,7 @@ export const DICT: Record<string, Record<string, string>> = {
     '🏆 Zwycięzca: {0}': '🏆 Vainqueur : {0}',
   },
   de: {
+    'Strona www i konto': 'Website und Konto',
     ' — oferty pracy!': ' — Jobangebote!',
     ' • pierwszy mecz {0}:{1}': ' • Hinspiel {0}:{1}',
     '1 drużyna': '1 Team',
@@ -836,7 +837,6 @@ export const DICT: Record<string, Record<string, string>> = {
     'Jeszcze nikt nie strzelił gola.': 'Noch hat niemand ein Tor geschossen.',
     'Język / Language': 'Sprache / Language',
     'KOP': 'SCHUSS',
-    'KOPANKA': 'KOPANKA',
     'Kadra': 'Kader',
     'Kadra i sprzedaż': 'Kader und Verkäufe',
     'Kadra może liczyć najwyżej {0} zawodników.': 'Der Kader darf höchstens {0} Spieler umfassen.',
@@ -1102,6 +1102,7 @@ export const DICT: Record<string, Record<string, string>> = {
     '🏆 Zwycięzca: {0}': '🏆 Sieger: {0}',
   },
   it: {
+    'Strona www i konto': 'Sito web e account',
     ' — oferty pracy!': ' — offerte di lavoro!',
     ' • pierwszy mecz {0}:{1}': ' • andata {0}:{1}',
     '1 drużyna': '1 squadra',
@@ -1203,7 +1204,6 @@ export const DICT: Record<string, Record<string, string>> = {
     'Jeszcze nikt nie strzelił gola.': 'Nessuno ha ancora segnato.',
     'Język / Language': 'Lingua / Language',
     'KOP': 'TIRO',
-    'KOPANKA': 'KOPANKA',
     'Kadra': 'Rosa',
     'Kadra i sprzedaż': 'Rosa e cessioni',
     'Kadra może liczyć najwyżej {0} zawodników.': 'La rosa può avere al massimo {0} giocatori.',
@@ -1469,6 +1469,7 @@ export const DICT: Record<string, Record<string, string>> = {
     '🏆 Zwycięzca: {0}': '🏆 Vincitore: {0}',
   },
   es: {
+    'Strona www i konto': 'Web y cuenta',
     ' — oferty pracy!': ' — ¡ofertas de trabajo!',
     ' • pierwszy mecz {0}:{1}': ' • ida {0}:{1}',
     '1 drużyna': '1 equipo',
@@ -1570,7 +1571,6 @@ export const DICT: Record<string, Record<string, string>> = {
     'Jeszcze nikt nie strzelił gola.': 'Nadie ha marcado todavía.',
     'Język / Language': 'Idioma / Language',
     'KOP': 'TIRO',
-    'KOPANKA': 'KOPANKA',
     'Kadra': 'Plantilla',
     'Kadra i sprzedaż': 'Plantilla y ventas',
     'Kadra może liczyć najwyżej {0} zawodników.': 'La plantilla puede tener como máximo {0} jugadores.',
@@ -1836,6 +1836,7 @@ export const DICT: Record<string, Record<string, string>> = {
     '🏆 Zwycięzca: {0}': '🏆 Ganador: {0}',
   },
   nl: {
+    'Strona www i konto': 'Website en account',
     ' — oferty pracy!': ' — vacatures!',
     ' • pierwszy mecz {0}:{1}': ' • heenwedstrijd {0}:{1}',
     '1 drużyna': '1 team',
@@ -1937,7 +1938,6 @@ export const DICT: Record<string, Record<string, string>> = {
     'Jeszcze nikt nie strzelił gola.': 'Er is nog niet gescoord.',
     'Język / Language': 'Taal / Language',
     'KOP': 'TRAP',
-    'KOPANKA': 'KOPANKA',
     'Kadra': 'Selectie',
     'Kadra i sprzedaż': 'Selectie en verkoop',
     'Kadra może liczyć najwyżej {0} zawodników.': 'De selectie mag hoogstens {0} spelers tellen.',

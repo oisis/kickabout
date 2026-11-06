@@ -1,0 +1,383 @@
+// Human-like end-to-end session on two Android emulators (debug APK, fresh app data).
+// Everything goes through the UI: taps on buttons, typing, dropdowns, drags and touch play.
+// A (Polish): options, team editor, tactic editor, friendly vs computer with lineup changes.
+// B (English): options, team editor, a league match. Then both: online room with a custom
+// team, pause + substitution, then a quick match with extra time and penalties.
+//
+// Usage: scripts/start-server.sh, two booted emulators with the debug APK (data cleared), then
+//   node scripts/e2e-human.ts [emulator-5554] [emulator-5556]
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { DICT } from '../src/lang.ts';
+
+const ADB = `${process.env.ANDROID_HOME ?? `${process.env.HOME}/Android/Sdk`}/platform-tools/adb`;
+const SERVER = process.env.SERVER ?? '10.0.2.2:8787'; // e.g. 172.16.0.10:30080/ws for the K3s deployment
+const SHOTS = process.env.SHOTS ?? '/tmp/kickabout-human';
+const [SERIAL_A = 'emulator-5554', SERIAL_B = 'emulator-5556'] = process.argv.slice(2);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const think = () => sleep(350 + Math.random() * 600); // a human glances at the screen before each tap
+const adb = (serial: string, ...args: string[]) => execFileSync(ADB, ['-s', serial, ...args], { encoding: 'utf8' });
+const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
+const results: [string, boolean, string][] = [];
+const check = (name: string, ok: boolean, detail = '') => { results.push([name, ok, detail]); log(ok ? 'OK  ' : 'FAIL', name, detail); };
+
+class Device {
+  ws!: WebSocket;
+  lang = 'pl';
+  private id = 0;
+  private pending = new Map<number, (v: any) => void>();
+  private shot = 0;
+  readonly name: string;
+  readonly serial: string;
+  readonly port: number;
+  constructor(name: string, serial: string, port: number) { this.name = name; this.serial = serial; this.port = port; }
+
+  /** Polish UI text in this device's language. */
+  t(pl: string) { return this.lang === 'pl' ? pl : DICT[this.lang]?.[pl] ?? pl; }
+
+  async launch() {
+    adb(this.serial, 'shell', 'am', 'force-stop', 'com.kickabout.game');
+    adb(this.serial, 'shell', 'am', 'start', '-n', 'com.kickabout.game/.MainActivity');
+    await sleep(3500);
+    const pid = adb(this.serial, 'shell', 'pidof', 'com.kickabout.game').trim();
+    try { adb(this.serial, 'forward', '--remove', `tcp:${this.port}`); } catch { /* not forwarded yet */ }
+    adb(this.serial, 'forward', `tcp:${this.port}`, `localabstract:webview_devtools_remote_${pid}`);
+    const pages = await (await fetch(`http://127.0.0.1:${this.port}/json`)).json();
+    this.ws = new WebSocket(pages.find((p: { url: string }) => p.url.startsWith('http://localhost')).webSocketDebuggerUrl);
+    await new Promise((r) => (this.ws.onopen = r));
+    this.ws.onmessage = (e) => { const m = JSON.parse(String(e.data)); this.pending.get(m.id)?.(m); this.pending.delete(m.id); };
+    await this.cdp('Page.navigate', { url: 'http://localhost/?debug' }); // exposes the test hook only
+    await sleep(2500);
+    this.lang = await this.js(`(() => { const l = localStorage.getItem('kickabout.lang') || navigator.language.slice(0, 2); return ['pl', 'en', 'fr', 'de', 'it', 'es', 'nl'].includes(l) ? l : 'en'; })()`);
+  }
+
+  cdp(method: string, params: object = {}) {
+    return new Promise<any>((r, reject) => {
+      const i = ++this.id;
+      const timer = setTimeout(() => { this.pending.delete(i); reject(new Error(`${this.name}: ${method} timed out`)); }, 30_000);
+      this.pending.set(i, (v) => { clearTimeout(timer); r(v); });
+      this.ws.send(JSON.stringify({ id: i, method, params }));
+    });
+  }
+  async js<T = any>(expr: string): Promise<T> {
+    const r = await this.cdp('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true });
+    if (r.result?.exceptionDetails) throw new Error(`${this.name}: ${r.result.exceptionDetails.exception?.description ?? 'error'} in ${expr.slice(0, 80)}`);
+    return r.result?.result?.value as T;
+  }
+  touch(type: string, points: { x: number; y: number; id: number }[]) { return this.cdp('Input.dispatchTouchEvent', { type, touchPoints: points }); }
+  snap(label: string) {
+    const f = `${SHOTS}/${this.name}-${String(++this.shot).padStart(2, '0')}-${label}.png`;
+    execFileSync('sh', ['-c', `"${ADB}" -s ${this.serial} exec-out screencap -p > "${f}"`]);
+  }
+
+  /** Scrolls a #ui element into view and returns its centre; `find` is a JS expression yielding the element. */
+  private async locate(find: string, what: string) {
+    const p = await this.js<{ x: number; y: number } | null>(`(() => { const el = ${find}; if (!el) return null;
+      el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    if (!p) throw new Error(`${this.name}: not on screen: ${what}`);
+    return p;
+  }
+  /** A finger tap (touch start/end) at a point. */
+  async tapAt(x: number, y: number) {
+    await this.touch('touchStart', [{ x, y, id: 1 }]); await sleep(70); await this.touch('touchEnd', []);
+  }
+  /** Taps the button / row whose text matches (exact, then prefix). */
+  async tap(text: string, opts: { sel?: string; translate?: boolean } = {}) {
+    await think();
+    const label = opts.translate === false ? text : this.t(text);
+    const sel = opts.sel ?? 'button, tr, li, label';
+    const p = await this.locate(`(() => { const all = [...document.querySelectorAll('#ui ${sel}')].filter((e) => e.offsetParent);
+      const s = ${JSON.stringify(label)}; return all.find((e) => e.textContent.trim() === s) ?? all.find((e) => e.textContent.trim().startsWith(s)) ?? all.find((e) => e.textContent.includes(s)); })()`, label);
+    await this.tapAt(p.x, p.y);
+    await sleep(250);
+  }
+  field(label: string, tag: string) {
+    return `[...document.querySelectorAll('#ui label.field')].find((l) => l.querySelector('span')?.textContent === ${JSON.stringify(this.t(label))})?.querySelector('${tag}')`;
+  }
+  /** Picks an option from a dropdown (the native picker is replaced by setting the choice the user would make). */
+  async choose(label: string, option: string, exact = false) {
+    await think();
+    await this.locate(this.field(label, 'select'), label);
+    const ok = await this.js<boolean>(`(() => { const s = ${this.field(label, 'select')}; const o = ${JSON.stringify(option)};
+      const i = [...s.options].findIndex((x) => ${exact ? 'x.text === o' : 'x.text.includes(o)'}); if (i < 0) return false;
+      s.selectedIndex = i; s.dispatchEvent(new Event('change')); return true; })()`);
+    if (!ok) throw new Error(`${this.name}: no option "${option}" in "${label}"`);
+    await sleep(250);
+  }
+  /** Taps a text field, clears it and types like a keyboard. */
+  async type(label: string, text: string, find?: string) {
+    await think();
+    const el = find ?? this.field(label, 'input');
+    const p = await this.locate(el, label);
+    await this.tapAt(p.x, p.y);
+    await this.js(`(() => { const i = ${el}; i.focus(); i.select(); })()`);
+    for (const ch of text) { await this.cdp('Input.insertText', { text: ch }); await sleep(60 + Math.random() * 80); }
+    adb(this.serial, 'shell', 'input', 'keyevent', 'KEYCODE_BACK'); // hide the soft keyboard
+    await sleep(400);
+  }
+  async toggle(label: string, on: boolean) {
+    const checked = await this.js<boolean>(`${this.field(label, 'input')}.checked`);
+    if (checked !== on) await this.tap(label, { sel: 'label.field' });
+  }
+  screenText() { return this.js<string>(`document.querySelector('#ui').innerText`); }
+
+  state() { return this.js<any>(`(() => { const r = kickabout.app.run, s = r?.s, n = r?.spec.net; return s ? { phase: s.phase, tick: s.tick, score: s.score, paused: s.paused, subsLeft: s.subsLeft, so: s.so, status: n?.status, room: n?.room, side: n?.side, message: n?.message, names: r.info.names } : { status: n?.status }; })()`); }
+  fingerprint() { return this.js<string>(`JSON.stringify({ ...kickabout.app.run.s, frame: 0, prevInput: [0, 0], eventFrame: 0 })`).then((j) => createHash('sha256').update(j).digest('hex').slice(0, 16)); }
+}
+
+/** A thumb on the stick (left) and taps or holds on the right half: pass, shot or slide tackle. */
+function startPlaying(d: Device) {
+  let alive = true, down = false;
+  (async () => {
+    const stick = { x: 103, y: 640, id: 1 }, kick = { x: 330, y: 780, id: 2 };
+    while (alive) {
+      try {
+        const a = Math.random() * Math.PI * 2, r = 30 + Math.random() * 30;
+        const moved = { ...stick, x: stick.x + Math.cos(a) * r, y: stick.y + Math.sin(a) * r };
+        if (!down) { await d.touch('touchStart', [stick]); down = true; }
+        await d.touch('touchMove', [moved]);
+        if (Math.random() < 0.45) {
+          await d.touch('touchStart', [moved, kick]);
+          await sleep(Math.random() < 0.5 ? 60 : 200 + Math.random() * 350);
+          await d.touch('touchEnd', [kick]);
+        }
+        await sleep(300 + Math.random() * 700);
+      } catch { /* screen changing */ }
+    }
+    if (down) await d.touch('touchEnd', []).catch(() => {});
+  })();
+  return () => { alive = false; };
+}
+
+async function waitFor(desc: string, ms: number, cond: () => Promise<boolean>) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) { if (await cond().catch(() => false)) return true; await sleep(500); }
+  check(desc, false, 'timeout');
+  return false;
+}
+
+/** Plays (touch) until full time, then returns the final state. */
+async function playToEnd(d: Device, desc: string, ms = 8 * 60_000) {
+  const stop = startPlaying(d);
+  await sleep(25_000); d.snap(`${desc}-gra`);
+  await waitFor(`${desc}: full time`, ms, async () => (await d.state()).phase === 'end');
+  stop(); await sleep(1500);
+  return d.state();
+}
+
+// ---------- scenes ----------
+
+async function setOptions(d: Device, lang: string, minutes: string, extra: boolean) {
+  await d.tap('Opcje');
+  if (d.lang !== lang) { // language switch reloads the app
+    await d.choose('Język / Language', { pl: 'Polski', en: 'English' }[lang]!, true);
+    await sleep(3000); d.lang = lang;
+    await d.tap('Opcje');
+  }
+  await d.choose('Długość meczu', minutes, true);
+  await d.toggle('Dźwięk', false);
+  await d.toggle('Muzyka w menu', false);
+  await d.toggle('Dogrywka przy remisie', extra);
+  await d.toggle('Rzuty karne przy remisie', extra);
+  d.snap('opcje');
+  const o = await d.js<any>(`JSON.parse(localStorage.getItem('kickabout.options') || '{}')`);
+  check(`${d.name}: options saved`, o.sound === false && o.minutes === parseInt(minutes) && o.extraTime === extra, JSON.stringify(o));
+  await d.tap('← Wstecz');
+}
+
+async function editTeam(d: Device, teamName: string, newName: string, short: string, shirt: string) {
+  await d.tap('Edytory drużyn i taktyk');
+  await d.choose('Drużyna', teamName, true);
+  await d.tap('Edytuj drużynę');
+  await d.type('Nazwa', newName);
+  await d.type('Skrót (3 litery)', short);
+  await d.js(`(() => { const c = ${d.field('Koszulka', 'input')}; c.value = '${shirt}'; c.dispatchEvent(new Event('input')); })()`);
+  // Player 1 gets a new name and better shooting.
+  await d.type('', 'Jan Kopacz', `document.querySelector('#ui table.edit tbody tr input')`);
+  await d.type('', '9', `document.querySelectorAll('#ui table.edit tbody tr')[9].querySelectorAll('input.num')[1]`);
+  d.snap('edytor-druzyny');
+  await d.tap('Zapisz');
+  const saved = await d.js<any[]>(`JSON.parse(localStorage.getItem('kickabout.teams') || '[]')`);
+  const t = saved.find((x) => x.name === newName);
+  check(`${d.name}: team edit saved`, !!t && t.short === short && t.kits[0].shirt === shirt && t.players[0].name === 'Jan Kopacz' && t.players[9].sh === 9, t ? `${t.name} ${t.short} ${t.kits[0].shirt}` : JSON.stringify(saved).slice(0, 120));
+}
+
+async function newTactic(d: Device) {
+  await d.choose('Nowa taktyka na bazie', '4-3-3');
+  await sleep(500);
+  await d.type('Nazwa', 'Atak skrzydłami');
+  // Drag the two wingers wider and higher with a finger-like mouse drag.
+  for (const [i, dx, dy] of [[10, -40, -40], [9, 40, -40]] as const) {
+    const p = await d.js<{ x: number; y: number }>(`(() => { const r = document.querySelectorAll('#ui .dot')[${i}].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    await d.cdp('Input.dispatchMouseEvent', { type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 });
+    for (let k = 1; k <= 8; k++) { await d.cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x + (dx * k) / 8, y: p.y + (dy * k) / 8, button: 'left', buttons: 1 }); await sleep(30); }
+    await d.cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p.x + dx, y: p.y + dy, button: 'left', clickCount: 1 });
+  }
+  d.snap('edytor-taktyki');
+  await d.tap('Zapisz taktykę');
+  const tac = await d.js<any[]>(`JSON.parse(localStorage.getItem('kickabout.tactics') || '[]')`);
+  check(`${d.name}: custom tactic saved`, tac.length === 1 && tac[0].name === 'Atak skrzydłami', tac.map((x) => x.name).join());
+  await d.tap('← Wstecz');
+}
+
+/** A: friendly, own edited team vs computer, custom tactic and a lineup swap. */
+async function friendly(d: Device, home: string, away: string) {
+  await d.tap('Mecz towarzyski');
+  await d.choose('Gospodarze', home, true);
+  await d.choose('Goście', away, true);
+  await d.choose('Murawa', 'Zależna od pory roku');
+  await d.tap('Skład i taktyka gospodarzy');
+  await d.choose('Taktyka', 'Atak skrzydłami');
+  await d.tap('Jan Kopacz', { sel: 'tbody tr', translate: false }); // swap him with the first bench player
+  await d.js(`document.querySelectorAll('#ui tbody tr')[11].scrollIntoView({ block: 'center' })`);
+  const r = await d.js<{ x: number; y: number }>(`(() => { const b = document.querySelectorAll('#ui tbody tr')[11].getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+  await think(); await d.tapAt(r.x, r.y);
+  d.snap('sklad');
+  await d.tap('Gotowe');
+  d.snap('towarzyski');
+  await d.tap('Graj!');
+  await sleep(2000);
+  const s = await d.state();
+  check(`${d.name}: friendly kicks off with the edited team`, s.names?.[0] === home, s.names?.join(' – '));
+  const end = await playToEnd(d, 'towarzyski');
+  d.snap('towarzyski-koniec');
+  check(`${d.name}: friendly finished`, end.phase === 'end', `${end.names?.join(' – ')} ${end.score?.join(':')}`);
+  await d.tap('Dalej');
+  await d.tap('← Wstecz'); // Dalej returns to the friendly setup
+}
+
+/** B: a preset league, pick a club, play one match, simulate the rest of the round, view the table. */
+async function league(d: Device) {
+  await d.tap('Rozgrywki');
+  const first = await d.js<string>(`document.querySelector('#ui .presets button').textContent`);
+  await d.tap(first, { translate: false });
+  const club = await d.js<string>(`document.querySelector('#ui tbody tr td').textContent`);
+  await think(); // "Controlled by" in the first club's row → Player 1
+  await d.js(`(() => { const s = document.querySelector('#ui tbody tr select'); s.selectedIndex = 1; s.dispatchEvent(new Event('change')); })()`);
+  d.snap('liga-wybor');
+  await d.tap('Rozpocznij');
+  d.snap('liga-hub');
+  await d.tap(d.t('Graj: {0} – {1}').split('{0}')[0], { translate: false });
+  d.snap('liga-przedmeczowy');
+  await d.tap('Graj!');
+  await sleep(1500);
+  d.snap('liga-start');
+  const end = await playToEnd(d, 'liga');
+  d.snap('liga-koniec');
+  check(`${d.name}: league match finished`, end.phase === 'end', `${end.names?.join(' – ')} ${end.score?.join(':')} (${club})`);
+  for (let i = 0; i < 3 && !(await d.screenText()).includes(d.t('Tabela')); i++) { await d.tap('Dalej').catch(() => {}); await sleep(800); }
+  if ((await d.screenText()).includes(d.t('Rozegraj kolejkę'))) await d.tap('Rozegraj kolejkę');
+  await d.tap('Tabela');
+  d.snap('liga-tabela');
+  const played = await d.js<number>(`[...document.querySelectorAll('#ui tbody tr')].filter((r) => r.children[2]?.textContent === '1').length`);
+  log(`${d.name} tabela:\n` + (await d.screenText()));
+  check(`${d.name}: league table after round 1`, played >= 2, `${played} clubs with 1 match`);
+  await d.tap('← Wstecz').catch(() => {});
+  await d.tap('Menu').catch(() => {});
+}
+
+async function goOnline(d: Device, mode: 'quick' | 'host' | 'join', teamName: string, code = '', extra = false) {
+  for (let i = 0; i < 3 && !(await d.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await d.tap('← Wstecz').catch(() => d.tap('Menu'));
+  await d.tap('Gra online');
+  await d.type('Adres serwera', SERVER);
+  await d.choose('Twoja drużyna', teamName, true);
+  await d.choose('Tryb', d.t({ quick: 'Szybka gra — losowy przeciwnik', host: 'Załóż pokój dla znajomego', join: 'Dołącz do pokoju znajomego' }[mode]), true);
+  if (mode === 'join') await d.type('Kod pokoju', code.toLowerCase()); // typed lowercase, the field uppercases
+  else { await d.choose('Murawa', d.t('Losowa'), true); await d.toggle('Dogrywka przy remisie', extra); await d.toggle('Rzuty karne przy remisie', extra); }
+  d.snap(`online-${mode}`);
+  await d.tap('Połącz');
+}
+
+async function bothFinish(name: string, a: Device, b: Device) {
+  const stopA = startPlaying(a), stopB = startPlaying(b);
+  await waitFor(`${name}: both reach full time`, 10 * 60_000, async () => (await a.state()).phase === 'end' && (await b.state()).phase === 'end');
+  stopA(); stopB(); await sleep(1000);
+  const [sa, sb] = [await a.state(), await b.state()];
+  const [fa, fb] = [await a.fingerprint(), await b.fingerprint()];
+  check(`${name}: identical final state on both phones`, fa === fb, `${fa} / ${fb}`);
+  check(`${name}: same result`, JSON.stringify(sa.score) === JSON.stringify(sb.score), `${sa.names?.join(' – ')} ${sa.score?.join(':')}${sa.so ? ` (pen. ${sa.so.goals.join(':')})` : ''}`);
+  check(`${name}: no desync/disconnect`, sa.status === 'playing' && sb.status === 'playing', `${sa.status}/${sb.status} ${sa.message ?? ''}${sb.message ?? ''}`);
+  a.snap(`${name}-koniec`); b.snap(`${name}-koniec`);
+  await a.tap('Dalej').catch(() => {}); await b.tap('Dalej').catch(() => {});
+}
+
+async function main() {
+  execFileSync('mkdir', ['-p', SHOTS]);
+  const A = new Device('A', SERIAL_A, 9401), B = new Device('B', SERIAL_B, 9402);
+  await Promise.all([A.launch(), B.launch()]);
+  A.snap('start'); B.snap('start');
+
+  log('1. Konfiguracja aplikacji i drużyn');
+  await Promise.all([setOptions(A, 'pl', '3 min', false), setOptions(B, 'en', '3 min', false)]);
+  const pickTeam = (d: Device, i: number) => d.js<string>(`(async () => { document.querySelectorAll('#ui nav button')[4].click(); await new Promise((r) => setTimeout(r, 200));
+    const n = document.querySelectorAll('#ui select')[0].options[${i}].text; document.querySelector('#ui .row button.ghost').click(); return n; })()`);
+  const [origA, origB] = [await pickTeam(A, 0), await pickTeam(B, 13)];
+  await Promise.all([
+    (async () => { await editTeam(A, origA, 'Orły Kopanki', 'ORK', '#ff6600'); await newTactic(A); })(),
+    (async () => { await editTeam(B, origB, 'Harbour Lions', 'HLI', '#1e90ff'); await B.tap('← Back'); })(),
+  ]);
+
+  log('2. Mecz towarzyski (A) i mecz ligowy (B) równolegle');
+  const awayA = await A.js<string>(`(async () => { document.querySelectorAll('#ui nav button')[0].click(); await new Promise((r) => setTimeout(r, 200));
+    const n = document.querySelectorAll('#ui select')[2].options[5].text; document.querySelector('#ui .row button.ghost').click(); return n; })()`);
+  await Promise.all([friendly(A, 'Orły Kopanki', awayA), league(B)]);
+
+  log('3. Online: pokój A (własna drużyna) ↔ B dołącza kodem');
+  await goOnline(A, 'host', 'Orły Kopanki');
+  await waitFor('3: room created', 15_000, async () => (await A.state()).status === 'room');
+  const code = (await A.state()).room;
+  A.snap('pokoj-kod');
+  check('3: room code', /^[A-Z]{4}$/.test(code), code);
+  await goOnline(B, 'join', 'Harbour Lions', code);
+  await waitFor('3: match starts on both', 20_000, async () => (await A.state()).status === 'playing' && (await B.state()).status === 'playing');
+  const s3 = await B.state();
+  check('3: B sees both custom teams', s3.names?.[0] === 'Orły Kopanki' && s3.names?.[1] === 'Harbour Lions', s3.names?.join(' – '));
+  let stopA = startPlaying(A), stopB = startPlaying(B);
+  await sleep(30_000);
+  stopA(); stopB(); await sleep(1200);
+  await A.tapAt(411 - 44, 44); // pause button on the pitch
+  await waitFor('3: pause on both', 5_000, async () => (await A.state()).paused && (await B.state()).paused);
+  A.snap('pauza'); B.snap('pauza');
+  await B.tap('Zmiany i taktyka{0}'.replace('{0}', ''));
+  await B.tap(await B.js<string>(`document.querySelectorAll('#ui tbody tr')[9].textContent.trim()`), { sel: 'tbody tr', translate: false });
+  await B.tap(await B.js<string>(`document.querySelectorAll('#ui tbody tr')[12].textContent.trim()`), { sel: 'tbody tr', translate: false });
+  B.snap('zmiana');
+  await waitFor('3: substitution on both', 5_000, async () => (await A.state()).subsLeft[1] === 2 && (await B.state()).subsLeft[1] === 2);
+  check('3: substitution on both', (await A.state()).subsLeft[1] === 2);
+  await B.tap('Gotowe'); await B.tap('Wznów');
+  await waitFor('3: resumed on both', 5_000, async () => !(await A.state()).paused && !(await B.state()).paused);
+  await bothFinish('online-pokoj', A, B);
+
+  log('4. Online: szybka gra, B czeka z dogrywką i karnymi');
+  await sleep(1500);
+  await goOnline(B, 'quick', 'Harbour Lions', '', true);
+  await waitFor('4: B waiting', 15_000, async () => (await B.state()).status === 'waiting');
+  await goOnline(A, 'quick', awayA);
+  await waitFor('4: match starts on both', 20_000, async () => (await A.state()).status === 'playing' && (await B.state()).status === 'playing');
+  check('4: waiting player is home', (await B.state()).side === 0, (await B.state()).names?.join(' – '));
+  await bothFinish('online-szybka', A, B);
+
+  log('5. Najlepsze momenty');
+  await sleep(1500);
+  await A.tap('Najlepsze momenty');
+  A.snap('momenty');
+  const goals = await A.js<number>(`document.querySelectorAll('#ui ul.list li').length`);
+  check('5: highlights list', true, `${goals} saved goals`);
+  if (goals) { await A.tap('▶', { sel: 'li button', translate: false }); await sleep(4000); A.snap('powtorka'); }
+
+  log('6. Odnośnik do strony www z menu aplikacji');
+  for (let i = 0; i < 3 && !(await A.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await A.tap('← Wstecz').catch(() => {});
+  await A.tap('Strona www i konto');
+  await sleep(5000);
+  const top = adb(SERIAL_A, 'shell', 'dumpsys', 'activity', 'activities');
+  const resumed = top.match(/topResumedActivity=.*? ([\w.]+)\//)?.[1] ?? '?';
+  check('6: website opens in the system browser', resumed !== 'com.kickabout.game', resumed);
+  A.snap('strona-www');
+  adb(SERIAL_A, 'shell', 'input', 'keyevent', 'KEYCODE_BACK');
+
+  const failed = results.filter(([, ok]) => !ok);
+  console.log(`\n${results.length - failed.length}/${results.length} checks passed; screenshots in ${SHOTS}`);
+  process.exit(failed.length ? 1 : 0);
+}
+
+main().catch((e) => { console.error(e); process.exit(2); });

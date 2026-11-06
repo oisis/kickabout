@@ -1,0 +1,7 @@
+apiVersion: v2
+name: kickabout
+description: Kickabout arcade football — website (home, accounts, browser game, APK download) and API server (accounts + online matches).
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+icon: https://kickabout.example.com/play/icon.svg

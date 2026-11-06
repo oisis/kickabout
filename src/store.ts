@@ -22,7 +22,7 @@ export interface Highlight { info: MatchInfo; title: string; start: State; input
 
 function load<T>(key: string, fallback: T): T {
   try {
-    const v = localStorage.getItem(`kopanka.${key}`);
+    const v = localStorage.getItem(`kickabout.${key}`);
     return v ? (JSON.parse(v) as T) : fallback;
   } catch {
     return fallback;
@@ -31,7 +31,7 @@ function load<T>(key: string, fallback: T): T {
 
 function save(key: string, v: unknown): boolean {
   try {
-    localStorage.setItem(`kopanka.${key}`, JSON.stringify(v));
+    localStorage.setItem(`kickabout.${key}`, JSON.stringify(v));
     return true;
   } catch {
     return false;

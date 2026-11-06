@@ -1,20 +1,15 @@
-// Kopanka multiplayer server: serves the built game over HTTP and pairs players
-// over WebSocket. It never simulates; it only orders input words (lockstep relay):
-// frame k is broadcast once both players have sent their input for tick k.
+// Kickabout API server: player accounts under /api (see accounts.ts) and online matches
+// over WebSocket (any path; the website proxies /ws here). It never simulates a match;
+// it only orders input words (lockstep relay): frame k is broadcast once both players
+// have sent their input for tick k. The website and the game are served by web/.
 import { createServer, type Server } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { join, normalize, extname } from 'node:path';
 import { networkInterfaces } from 'node:os';
 import { randomInt } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
+import { accounts, envProviders, type AccountOptions } from './accounts.ts';
 
-const DIST = join(import.meta.dirname, '..', 'dist');
 const DELAY = 6; // input delay in ticks (100 ms at 60 Hz)
 const MAX_AHEAD = 600; // 10 s of buffered inputs before we give up on a lagging peer
-const TYPES: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
-  '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.ogg': 'audio/ogg', '.md': 'text/markdown; charset=utf-8',
-};
 
 interface Match { players: WebSocket[]; inputs: Map<number, number>[]; next: number; hashes: Map<number, number> }
 
@@ -22,17 +17,11 @@ const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a);
 const send = (ws: WebSocket, msg: object) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); };
 const isTick = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 
-export function startServer(port: number): Server {
+export function startServer(port: number, opts: AccountOptions = {}): Server {
+  const api = accounts(opts);
   const http = createServer(async (req, res) => {
-    const path = normalize(decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname));
-    const file = join(DIST, path === '/' ? 'index.html' : path);
-    if (!file.startsWith(DIST)) { res.writeHead(404).end(); return; }
-    try {
-      const body = await readFile(file);
-      res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' }).end(body);
-    } catch {
-      res.writeHead(404).end('Nie znaleziono (czy uruchomiono "npm run build"?)');
-    }
+    if (req.url === '/healthz') { res.writeHead(200).end('ok'); return; }
+    if (!(await api(req, res))) res.writeHead(404, { 'content-type': 'text/plain' }).end('Kickabout API');
   });
 
   const matches = new Map<WebSocket, Match>();
@@ -119,10 +108,11 @@ export function startServer(port: number): Server {
 }
 
 if (import.meta.main) {
-  const port = Number(process.env.PORT ?? 8787);
-  startServer(port).on('listening', () => {
+  const env = process.env, port = Number(env.PORT ?? 8787);
+  const providers = envProviders();
+  startServer(port, { db: env.DB_PATH ?? 'kickabout.db', publicUrl: env.PUBLIC_URL ?? `http://localhost:${port}`, providers, devLogin: env.DEV_LOGIN === '1' }).on('listening', () => {
     const ips = Object.values(networkInterfaces()).flat().filter((i) => i?.family === 'IPv4' && !i.internal).map((i) => i!.address);
-    log(`Serwer Kopanki działa na porcie ${port}.`);
-    for (const ip of ips) log(`  w przeglądarce telefonu: http://${ip}:${port}   •   w aplikacji podaj: ${ip}:${port}`);
+    log(`Kickabout API na porcie ${port}; logowanie: ${[...Object.keys(providers), ...(env.DEV_LOGIN === '1' ? ['dev'] : [])].join(', ') || 'wyłączone'}.`);
+    for (const ip of ips) log(`  w aplikacji podaj: ${ip}:${port}`);
   });
 }

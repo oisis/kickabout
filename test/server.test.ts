@@ -93,15 +93,12 @@ test('private room: host gets a code, a friend joins with it, wrong codes are re
   http.close();
 });
 
-test('serves the built game and refuses paths outside it', async () => {
+test('answers health checks and keeps static files to the website', async () => {
   const http = startServer(0);
   await once(http, 'listening');
   const base = `http://127.0.0.1:${(http.address() as AddressInfo).port}`;
-  const index = await fetch(`${base}/`);
-  assert.ok([200, 404].includes(index.status)); // 404 only when dist/ was not built
-  if (index.status === 200) assert.match(await index.text(), /Kopanka/);
-  assert.equal((await fetch(`${base}/%2e%2e/package.json`)).status, 404);
-  assert.equal((await fetch(`${base}/`)).status, index.status); // still alive after a bad request
+  assert.equal(await (await fetch(`${base}/healthz`)).text(), 'ok');
+  assert.equal((await fetch(`${base}/index.html`)).status, 404);
   http.closeAllConnections();
   http.close();
 });

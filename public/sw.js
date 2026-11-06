@@ -1,5 +1,5 @@
 // Network first, cache fallback: always fresh online, playable offline after one visit.
-const CACHE = 'kopanka';
+const CACHE = 'kickabout';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', (e) => {

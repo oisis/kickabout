@@ -9,7 +9,9 @@ export const LANGS: [Lang, string][] = [['pl', 'Polski'], ['en', 'English'], ['f
 
 function detect(): Lang {
   try {
-    const saved = localStorage.getItem('kopanka.lang') as Lang | null;
+    // The game was called Kopanka: carry saves over to the new key prefix once.
+    for (const k of Object.keys(localStorage)) if (k.startsWith('kopanka.') && localStorage.getItem(`kickabout.${k.slice(8)}`) === null) localStorage.setItem(`kickabout.${k.slice(8)}`, localStorage.getItem(k)!);
+    const saved = localStorage.getItem('kickabout.lang') as Lang | null;
     if (saved && LANGS.some(([l]) => l === saved)) return saved;
   } catch { /* storage unavailable */ }
   const nav = (globalThis.navigator?.language ?? 'pl').slice(0, 2) as Lang;
@@ -25,7 +27,7 @@ export function t(key: string, ...args: (string | number)[]): string {
 }
 
 export function setLang(l: Lang) {
-  try { localStorage.setItem('kopanka.lang', l); } catch { /* storage unavailable */ }
+  try { localStorage.setItem('kickabout.lang', l); } catch { /* storage unavailable */ }
   location.reload();
 }
 

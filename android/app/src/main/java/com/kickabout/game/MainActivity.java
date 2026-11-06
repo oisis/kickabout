@@ -1,4 +1,4 @@
-package pl.kopanka.game;
+package com.kickabout.game;
 
 import android.os.Build;
 import android.view.WindowManager;
