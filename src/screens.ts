@@ -238,7 +238,7 @@ function online(app: App) {
   const o = options();
   const state = { address: savedServer(), team: TEAMS[0].id, club: false, voice: false, hidden: false, spectate: false, mode: 'quick', code: '', minutes: o.minutes, pitch: o.pitch, extraTime: o.extraTime, penalties: o.penalties };
   const draw = () => show(
-    title(tr('Gra online'), tr('Obaj gracze łączą się z tym samym serwerem (scripts/start-server.sh)')),
+    title(tr('Gra online'), tr('Obaj gracze łączą się z tym samym serwerem')),
     input(tr('Adres serwera'), state.address, (v) => { state.address = v; }, { placeholder: '192.168.1.10:8787', autocapitalize: 'off' }),
     select(tr('Twoja drużyna'), state.team, teamOptions(), (v) => { state.team = v; }),
     toggle(tr('Zagraj moim klubem online (nagrody, wymaga konta)'), state.club, (v) => { state.club = v; }),

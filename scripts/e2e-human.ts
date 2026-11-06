@@ -273,7 +273,7 @@ async function league(d: Device) {
   const played = await d.js<number>(`[...document.querySelectorAll('#ui tbody tr')].filter((r) => r.children[2]?.textContent === '1').length`);
   log(`${d.name} tabela:\n` + (await d.screenText()));
   check(`${d.name}: league table after round 1`, played >= 2, `${played} clubs with 1 match`);
-  await d.tap('← Wstecz').catch(() => {});
+  await d.tap('← Wstecz').catch(() => d.tap('OK')).catch(() => {});
   await d.tap('Menu').catch(() => {});
 }
 
@@ -318,12 +318,12 @@ const coinsOnScreen = async (d: Device) => Number(((await d.screenText()).match(
 
 /** Back to the club menu (the only screen with the account history button). */
 async function backToClub(d: Device) {
-  for (let i = 0; i < 5 && !(await d.screenText()).includes(d.t('Historia konta')); i++) await d.tap('← Wstecz').catch(() => {});
+  for (let i = 0; i < 5 && !(await d.screenText()).includes(d.t('Historia konta')); i++) await d.tap('← Wstecz').catch(() => d.tap('OK')).catch(() => {});
 }
 
 /** "My club": enter the code from the website's account page, then found a club. */
 async function linkAndFound(d: Device, code: string, name: string, short: string) {
-  for (let i = 0; i < 3 && !(await d.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await d.tap('← Wstecz').catch(() => {});
+  for (let i = 0; i < 3 && !(await d.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await d.tap('← Wstecz').catch(() => d.tap('OK')).catch(() => {});
   await d.tap('Mój klub (online)'); await sleep(1500);
   d.snap('klub-logowanie');
   await d.type('Kod z panelu konta', code);
@@ -420,7 +420,7 @@ const fakeMic = (d: Device, hz: number) => d.js(`navigator.mediaDevices.getUserM
 
 async function voicePhase(A: Device, B: Device) {
   log('10. Czat głosowy w prywatnym pokoju');
-  for (const d of [A, B]) for (let i = 0; i < 3 && !(await d.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await d.tap('← Wstecz').catch(() => {});
+  for (const d of [A, B]) for (let i = 0; i < 3 && !(await d.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await d.tap('← Wstecz').catch(() => d.tap('OK')).catch(() => {});
   await fakeMic(A, 440); await fakeMic(B, 660);
   await goOnline(A, 'host', 'London Navigators', '', false, false, true);
   await waitFor('10: room created', 15_000, async () => (await A.state()).status === 'room');
@@ -430,12 +430,12 @@ async function voicePhase(A: Device, B: Device) {
   const connected = await waitFor('10: voice connected on both phones', 30_000, async () =>
     (await A.js<string>(`kickabout.app.voice?.state`)) === 'connected' && (await B.js<string>(`kickabout.app.voice?.state`)) === 'connected');
   if (connected) check('10: voice connected on both phones', true);
-  const f0 = (await A.state()).tick;
+  const f0 = await A.js<number>(`kickabout.state().frame`);
   await sleep(10_000);
-  const f1 = (await A.state()).tick;
+  const f1 = await A.js<number>(`kickabout.state().frame`);
   const bytes = [await A.js<number>(`kickabout.app.voice.received()`), await B.js<number>(`kickabout.app.voice.received()`)];
   check('10: each phone hears the other', bytes.every((n) => n > 1000), bytes.join(' / ') + ' bytes');
-  check('10: the match keeps its pace during the call', f1 - f0 > 450, `${f1 - f0} ticks in 10 s`);
+  check('10: the match keeps its pace during the call', f1 - f0 > 570, `${f1 - f0} frames in 10 s`);
   const pair = await A.js<string>(`(async () => { let s = ''; (await kickabout.app.voice.pc.getStats()).forEach((r) => { if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded') s = r.localCandidateId; }); const st = await kickabout.app.voice.pc.getStats(); return st.get(s)?.candidateType ?? '?'; })()`);
   log(`   ścieżka głosu na A: ${pair}`);
   A.snap('glos'); B.snap('glos');
@@ -452,7 +452,7 @@ async function voicePhase(A: Device, B: Device) {
 /** A room the website's fan zone may show; logs the match pace before and while fans watch. */
 async function fansPhase(A: Device, B: Device) {
   log('11. Strefa kibica: pokój z pozwoleniem na oglądanie');
-  for (const d of [A, B]) for (let i = 0; i < 3 && !(await d.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await d.tap('← Wstecz').catch(() => {});
+  for (const d of [A, B]) for (let i = 0; i < 3 && !(await d.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await d.tap('← Wstecz').catch(() => d.tap('OK')).catch(() => {});
   await goOnline(A, 'host', 'London Navigators', '', false, false, false, true);
   await waitFor('11: room created', 15_000, async () => (await A.state()).status === 'room');
   await goOnline(B, 'join', 'Leeds Sentinels', (await A.state()).room);
@@ -474,6 +474,20 @@ async function fansPhase(A: Device, B: Device) {
   await bothFinish('kibice', A, B);
 }
 
+/** Quick match: phone A against a third player in a web browser (/play/), who connects meanwhile. */
+async function webPhase(A: Device) {
+  log('12. Szybka gra: telefon A czeka na gracza z przeglądarki');
+  for (let i = 0; i < 3 && !(await A.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await A.tap('← Wstecz').catch(() => {});
+  await goOnline(A, 'quick', 'London Navigators');
+  await waitFor('12: A waiting', 15_000, async () => (await A.state()).status === 'waiting');
+  log('   CZEKAM NA PRZEGLĄDARKĘ');
+  await waitFor('12: browser player joins', 5 * 60_000, async () => (await A.state()).status === 'playing');
+  log('   MECZ: ' + (await A.state()).names?.join(' – '));
+  const s = await playToEnd(A, 'web', 10 * 60_000);
+  check('12: phone vs browser reaches full time', s.phase === 'end' && s.status === 'playing', `${s.names?.join(' – ')} ${s.score?.join(':')} ${s.status}`);
+  log('   WYNIK ' + s.score?.join(':') + ' tick ' + s.tick);
+}
+
 async function main() {
   execFileSync('mkdir', ['-p', SHOTS]);
   const A = new Device('A', SERIAL_A, 9401), B = new Device('B', SERIAL_B, 9402);
@@ -485,6 +499,7 @@ async function main() {
     if (phases.includes('club')) await clubPhase(A, B);
     if (phases.includes('voice')) await voicePhase(A, B);
     if (phases.includes('fans')) await fansPhase(A, B);
+    if (phases.includes('web')) await webPhase(A);
     return finish();
   }
 
