@@ -137,7 +137,7 @@ function startPlaying(d: Device) {
   (async () => {
     const stick = { x: 103, y: 640, id: 1 }, shot = { x: 411 - 78, y: 914 - 100, id: 2 }, pass = { x: 411 - 190, y: 914 - 62, id: 2 };
     const look = `(() => { const r = kickabout.app.run, s = r?.s; if (!s || s.phase === 'end') return null;
-      const me = r.me, p = s.teams[me][s.controlled[me]], b = s.ball, M = 1024, gy = s.sides[me] === -1 ? 0 : 105 * M;
+      const me = r.me, p = s.teams[me][s.controlled[me]], b = s.ball, M = 1024, gy = s.period === 4 || s.sides[me] === -1 ? 0 : 105 * M; // a shootout is at the top goal
       const own = s.ownerTeam === me && s.ownerIdx === s.controlled[me];
       const opp = s.ownerTeam === 1 - me ? s.teams[s.ownerTeam][s.ownerIdx] : null;
       return { own, play: s.phase === 'play' && !s.paused, tx: own ? 34 * M - p.x : b.x + b.vx * 8 - p.x, ty: own ? gy - p.y : b.y + b.vy * 8 - p.y,

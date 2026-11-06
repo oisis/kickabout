@@ -203,3 +203,17 @@ test('a keeper holding the ball never loses it straight to an opponent: he throw
   }
   assert.ok(releases > 0, 'keepers did release the ball');
 });
+
+test('a shootout ends even if nobody presses anything (a penalty taker shoots by himself after 10 s)', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const s = newMatch(seed, setup({ minutes: 1, penalties: true }));
+    while (s.phase !== 'end' && s.period !== 4) step(s, [cpuInput(s, 0), cpuInput(s, 1)]);
+    if (s.phase === 'end') continue; // decided in normal time
+    let f = 0;
+    while (s.phase !== 'end' && f++ < 60_000) step(s, [0, 0]);
+    assert.equal(s.phase, 'end', `seed ${seed}: shootout never finished`);
+    assert.notEqual(s.so!.goals[0], s.so!.goals[1]);
+    return;
+  }
+  assert.fail('no seed reached a shootout');
+});

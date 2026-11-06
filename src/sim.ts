@@ -92,8 +92,8 @@ export interface State {
   timer: number;
   kickoffTeam: number;
   restart: { type: RestartType; team: number; idx: number; x: number; y: number } | null;
-  /** Penalty in progress; `dive` is the side the keeper guesses at the kick (-1, 0, 1). */
-  pk: { team: number; idx: number; kicked: number; t: number; dive: number } | null;
+  /** Penalty in progress; `dive` is the side the keeper guesses at the kick (-1, 0, 1); `wait` frames before it. */
+  pk: { team: number; idx: number; kicked: number; t: number; dive: number; wait: number } | null;
   so: { goals: number[]; taken: number[]; turn: number; next: number[] } | null; // shootout
   score: number[];
   teams: Player[][];
@@ -358,7 +358,7 @@ function deadBall(s: State) {
       // his feet would be out again at once (throw-ins used to bounce between the teams forever).
       Object.assign(p, { x: clamp(r.x - div(dx * 360, d), 0, W), y: clamp(r.y - div(dy * 360, d), 0, H), vx: 0, vy: 0, ax: 0, ay: 0, fx: div(dx * 1000, d), fy: div(dy * 1000, d) });
       if (r.type === 'penalty') {
-        s.pk = { team: r.team, idx: r.idx, kicked: 0, t: 0, dive: 0 };
+        s.pk = { team: r.team, idx: r.idx, kicked: 0, t: 0, dive: 0, wait: 0 };
         Object.assign(s.teams[1 - r.team][0], { x: W / 2, y: ownGoalY(s, 1 - r.team), vx: 0, vy: 0 });
       }
       s.restart = null; s.phase = 'play';
@@ -439,6 +439,7 @@ function live(s: State, inputs: readonly number[]) {
   contest(s);
   if (s.ownerTeam >= 0) s.stats.poss[s.ownerTeam]++;
   if (s.pk && s.pk.kicked) s.pk.t++;
+  else if (s.pk && s.phase === 'play' && ++s.pk.wait > 600 && s.ownerTeam === s.pk.team) kick(s, s.pk.team, s.teams[s.pk.team][s.pk.idx], 20); // nobody shoots in 10 s (a player left the phone): he shoots himself
   rules(s);
   if (s.phase !== 'play' || s.period === 4) return;
   s.tick++;
@@ -486,7 +487,7 @@ function setupPenalty(s: State) {
   const p = s.teams[t][idx];
   Object.assign(p, { x: W / 2, y: PEN_SPOT + 360 });
   placeBall(s, W / 2, PEN_SPOT);
-  s.pk = { team: t, idx, kicked: 0, t: 0, dive: 0 };
+  s.pk = { team: t, idx, kicked: 0, t: 0, dive: 0, wait: 0 };
   s.controlled[t] = idx;
   s.phase = 'shootout'; s.timer = 60;
   give(s, t, idx);
@@ -550,8 +551,9 @@ function goalAim(s: State, t: number, p: Player, from: { x: number; y: number },
   // Within ~40° of the goal; from the penalty spot a diagonal (8-way stick) means the corner, ~60°.
   if (d > 38 * M || tx * p.fx + ty * p.fy <= (s.pk ? 500 : 770) * d) return null;
   const side = p.fx > 300 ? 1 : p.fx < -300 ? -1 : 0;
-  const spread = div(GOAL_HALF * (16 - skill), 10);
-  return [W / 2 + side * div(GOAL_HALF * 7, 10) + rnd(s, spread + 1) - div(spread, 2), gy];
+  // From the spot (11 m, no one in the way) the aim is tighter than in open play.
+  const spread = div(GOAL_HALF * (s.pk ? 11 - skill : 16 - skill), 10);
+  return [W / 2 + side * div(GOAL_HALF * (s.pk ? 6 : 7), 10) + rnd(s, spread + 1) - div(spread, 2), gy];
 }
 
 function kick(s: State, t: number, p: Player, hold: number) {
