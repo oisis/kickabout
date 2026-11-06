@@ -137,3 +137,19 @@ test('restarts do not loop: a 5-minute match lasts about 5 minutes', () => {
     assert.ok(s.frame < 5 * 3600 * 1.3, `seed ${seed}: ${(s.frame / 3600).toFixed(1)} min`);
   }
 });
+
+test('after a goal the ball stays inside the net', () => {
+  for (const [vx, vz] of [[0, 0], [-160, 0], [160, 30], [90, 60]]) {
+    const s = newMatch(1, setup());
+    s.phase = 'play';
+    s.teams[1][0].x = 0; s.teams[0][0].x = 0; // keepers out of the way
+    Object.assign(s.ball, { x: W / 2, y: M, z: 0, vx, vy: -260, vz });
+    for (let i = 0; i < 160 && s.phase !== 'kickoff'; i++) {
+      step(s, [0, 0]);
+      if (s.phase !== 'goal') continue;
+      const b = s.ball;
+      assert.ok(Math.abs(b.x - W / 2) <= 3748 && b.y >= -2 * M && b.z <= 2499, `vx ${vx}: ball at ${b.x - W / 2}, ${b.y}, ${b.z}`);
+    }
+    assert.equal(s.score[0] + s.score[1], 1, `vx ${vx}: a goal`);
+  }
+});

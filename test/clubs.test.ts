@@ -152,7 +152,8 @@ test('an online match between two clubs pays both owners (app token and browser 
   await bob.call('/me/club', { name: 'Harbour Lions', short: 'HLI' });
   // Ala links "the app" with a one-time code; Bob plays in the browser with his cookie.
   const code = (await ala.call('/me/app-code', {})).data.code;
-  const token = (await (await fetch(`${base}/api/app-token`, { method: 'POST', body: JSON.stringify({ code: code.toLowerCase() }) })).json()).token;
+  // The app's WebView sends Origin: http://localhost and has no cookie.
+  const token = (await (await fetch(`${base}/api/app-token`, { method: 'POST', headers: { origin: 'http://localhost' }, body: JSON.stringify({ code: code.toLowerCase() }) })).json()).token;
   assert.ok(token);
   assert.equal((await fetch(`${base}/api/app-token`, { method: 'POST', body: JSON.stringify({ code }) })).status, 404, 'codes work once');
   assert.equal((await (await fetch(`${base}/api/me/club`, { headers: { authorization: `Bearer ${token}` } })).json()).club.team.short, 'ORK');

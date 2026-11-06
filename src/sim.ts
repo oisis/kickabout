@@ -297,8 +297,7 @@ function deadBall(s: State) {
     if (s.phase === 'out' && s.timer === 60) placeBall(s, s.restart!.x, s.restart!.y);
     if (s.phase === 'goal') {
       freeBall(s);
-      const b = s.ball;
-      if (b.y < -2 * M || b.y > H + 2 * M) { b.vx = b.vy = 0; b.y = clamp(b.y, -2 * M, H + 2 * M); }
+      netBall(s);
     }
     if (s.phase === 'shootout' || s.phase === 'kickoff') return;
     const r = s.restart, b = s.ball;
@@ -581,6 +580,19 @@ function dribble(s: State) {
   const p = s.teams[s.ownerTeam][s.ownerIdx], b = s.ball;
   b.x = p.x + div(p.fx * 360, 1000); b.y = p.y + div(p.fy * 360, 1000);
   b.z = 0; b.vx = p.ax; b.vy = p.ay; b.vz = 0;
+}
+
+const NET_DEPTH = 2 * M, BALL_R = 250;
+
+/** After a goal the ball stays in the net: the side netting, back and roof soak it up. */
+function netBall(s: State) {
+  const b = s.ball, top = b.y < H / 2, line = top ? 0 : H;
+  if (top ? b.y > line : b.y < line) return; // not over the line yet
+  const back = top ? -NET_DEPTH + BALL_R : H + NET_DEPTH - BALL_R;
+  if (top ? b.y < back : b.y > back) { b.y = back; b.vy = -div(b.vy, 4); }
+  const lo = W / 2 - GOAL_HALF + BALL_R, hi = W / 2 + GOAL_HALF - BALL_R;
+  if (b.x < lo || b.x > hi) { b.x = clamp(b.x, lo, hi); b.vx = -div(b.vx, 3); }
+  if (b.z > CROSSBAR - BALL_R) { b.z = CROSSBAR - BALL_R; b.vz = Math.min(b.vz, 0); }
 }
 
 function freeBall(s: State) {

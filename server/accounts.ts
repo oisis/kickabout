@@ -164,8 +164,10 @@ export function accounts(opts: AccountOptions = {}, routes: Route[] = []) {
       return true;
     }
     const user = userOf(req);
-    // Cookies are SameSite=Lax; also refuse cookie-authenticated changes from other sites.
-    if (method !== 'GET' && origin && user?.via !== 'bearer' && URL.parse(origin)?.host !== host && origin !== siteOrigin) { send(403, { error: 'origin' }); return true; }
+    // Cookies are SameSite=Lax; also refuse changes from other sites that ride on the session cookie.
+    // Requests without it (the app's code exchange, Bearer calls) carry nothing to forge.
+    const cookieAuth = !!cookies(req).sid && user?.via !== 'bearer';
+    if (method !== 'GET' && origin && cookieAuth && URL.parse(origin)?.host !== host && origin !== siteOrigin) { send(403, { error: 'origin' }); return true; }
     const body = async (limit = 4096) => {
       let s = '';
       for await (const c of req) { s += c; if (s.length > limit) throw new Error('too large'); }

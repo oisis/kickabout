@@ -277,19 +277,20 @@ async function league(d: Device) {
   await d.tap('Menu').catch(() => {});
 }
 
-async function goOnline(d: Device, mode: 'quick' | 'host' | 'join', teamName: string, code = '', extra = false) {
+async function goOnline(d: Device, mode: 'quick' | 'host' | 'join', teamName: string, code = '', extra = false, club = false) {
   for (let i = 0; i < 3 && !(await d.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await d.tap('← Wstecz').catch(() => d.tap('Menu'));
   await d.tap('Gra online');
   await d.type('Adres serwera', SERVER);
   await d.choose('Twoja drużyna', teamName, true);
   await d.choose('Tryb', d.t({ quick: 'Szybka gra — losowy przeciwnik', host: 'Załóż pokój dla znajomego', join: 'Dołącz do pokoju znajomego' }[mode]), true);
+  await d.toggle('Zagraj moim klubem online (nagrody, wymaga konta)', club);
   if (mode === 'join') await d.type('Kod pokoju', code.toLowerCase()); // typed lowercase, the field uppercases
   else { await d.choose('Murawa', d.t('Losowa'), true); await d.toggle('Dogrywka przy remisie', extra); await d.toggle('Rzuty karne przy remisie', extra); }
   d.snap(`online-${mode}`);
   await d.tap('Połącz');
 }
 
-async function bothFinish(name: string, a: Device, b: Device) {
+async function bothFinish(name: string, a: Device, b: Device, leave = true) {
   const stopA = startPlaying(a), stopB = startPlaying(b);
   await waitFor(`${name}: both reach full time`, 10 * 60_000, async () => (await a.state()).phase === 'end' && (await b.state()).phase === 'end');
   stopA(); stopB(); await sleep(1000);
@@ -299,7 +300,113 @@ async function bothFinish(name: string, a: Device, b: Device) {
   check(`${name}: same result`, JSON.stringify(sa.score) === JSON.stringify(sb.score), `${sa.names?.join(' – ')} ${sa.score?.join(':')}${sa.so ? ` (pen. ${sa.so.goals.join(':')})` : ''}`);
   check(`${name}: no desync/disconnect`, sa.status === 'playing' && sb.status === 'playing', `${sa.status}/${sb.status} ${sa.message ?? ''}${sb.message ?? ''}`);
   a.snap(`${name}-koniec`); b.snap(`${name}-koniec`);
-  await a.tap('Dalej').catch(() => {}); await b.tap('Dalej').catch(() => {});
+  if (leave) { await a.tap('Dalej').catch(() => {}); await b.tap('Dalej').catch(() => {}); }
+}
+
+// ---------- online club (website account + app) ----------
+
+/** Taps the first button whose text starts with the translated text before {0}. */
+const tapPrefix = (d: Device, pl: string) => d.tap(d.t(pl).split('{0}')[0].trim(), { translate: false });
+const tapRow = async (d: Device, i: number) => {
+  await think();
+  const p = await d.js<{ x: number; y: number }>(`(() => { const r = document.querySelectorAll('#ui tbody tr')[${i < 0 ? `document.querySelectorAll('#ui tbody tr').length ${i}` : i}]; r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+  await d.tapAt(p.x, p.y); await sleep(1200);
+};
+const coinsOnScreen = async (d: Device) => Number(((await d.screenText()).match(/([\d\s\u00a0.,]+) 🪙/)?.[1] ?? '').replace(/[^\d]/g, ''));
+
+/** Back to the club menu (the only screen with the account history button). */
+async function backToClub(d: Device) {
+  for (let i = 0; i < 5 && !(await d.screenText()).includes(d.t('Historia konta')); i++) await d.tap('← Wstecz').catch(() => {});
+}
+
+/** "My club": enter the code from the website's account page, then found a club. */
+async function linkAndFound(d: Device, code: string, name: string, short: string) {
+  for (let i = 0; i < 3 && !(await d.js<boolean>(`!!document.querySelector('#ui .logo')`)); i++) await d.tap('← Wstecz').catch(() => {});
+  await d.tap('Mój klub (online)'); await sleep(1500);
+  d.snap('klub-logowanie');
+  await d.type('Kod z panelu konta', code);
+  await d.tap('Połącz z kontem'); await sleep(2000);
+  await d.type('Nazwa klubu', name);
+  await d.type('Skrót (3 litery)', short);
+  d.snap('klub-zakladanie');
+  await d.tap('Załóż klub', { sel: 'button' }); await sleep(2000);
+  const text = await d.screenText();
+  check(`${d.name}: app linked to the website account, club founded`, text.includes(name), text.split('\n')[0]);
+  d.snap('klub');
+}
+
+/** Buy a player from a computer club through the transfer market. */
+async function buyFromMarket(d: Device) {
+  const before = await coinsOnScreen(d);
+  await d.tap('Rynek transferowy'); await sleep(1500);
+  d.snap('rynek');
+  await tapRow(d, -1); // the weakest club of the league
+  d.snap('rynek-klub');
+  await tapRow(d, -1);
+  d.snap('rynek-zawodnik');
+  await tapPrefix(d, 'Kup za {0}'); await sleep(1500);
+  await backToClub(d);
+  const after = await coinsOnScreen(d);
+  check(`${d.name}: bought a player from a computer club`, after < before, `${before} → ${after}`);
+}
+
+/** A 5-minute match against the computer for prize money; the server replays it. */
+async function prizeMatch(d: Device) {
+  const before = await coinsOnScreen(d);
+  await tapPrefix(d, 'Mecz o nagrodę ({0} dziś)'); await sleep(800);
+  await d.choose('Długość meczu', '5 min', true);
+  await d.tap('Losuj rywala o podobnej sile i graj'); await sleep(2500);
+  const s = await d.state();
+  check(`${d.name}: prize match starts`, !!s.phase, s.names?.join(' – '));
+  const end = await playToEnd(d, 'nagroda', 9 * 60_000);
+  await sleep(2000);
+  await d.tap('Dalej'); await sleep(4000);
+  const text = await d.screenText();
+  d.snap('nagroda-wynik');
+  check(`${d.name}: server verified the match and paid`, text.includes(d.t('Nagroda: {0}').split('{0}')[0]), `${end.score?.join(':')} — ${text.split('\n').slice(0, 2).join(' ')}`);
+  await d.tap('Dalej'); await sleep(1500);
+  check(`${d.name}: coins grew`, (await coinsOnScreen(d)) > before, `${before} → ${await coinsOnScreen(d)}`);
+}
+
+/** B sponsors A's club (the amount prompt is answered like a user typing 200). */
+async function sponsor(b: Device, clubName: string) {
+  await b.tap('Rynek transferowy'); await sleep(1500);
+  await b.choose('Pokaż', b.t('Kluby graczy (z właścicielem)'), true); await sleep(1500);
+  await b.tap(clubName, { sel: 'tbody tr', translate: false }); await sleep(1500);
+  await b.js(`window.prompt = () => '200'`);
+  await b.tap('Sponsoruj klub'); await sleep(1500);
+  b.snap('sponsoring');
+  await backToClub(b);
+}
+
+async function clubPhase(A: Device, B: Device) {
+  const [codeA, codeB] = [process.env.CODE_A ?? '', process.env.CODE_B ?? ''];
+  // Website users and club names; unique per run so repeated runs do not meet old clubs.
+  const run = Date.now().toString(36).slice(-3).toUpperCase(), sponsorName = process.env.USER_B ?? 'Bob';
+  const [clubA, clubB] = [`Orły ${run}`, `Lions ${run}`];
+  if (!codeA || !codeB) { check('club: codes from the website (CODE_A, CODE_B)', false); return; }
+  log('7. Klub online: kod z konta na stronie → aplikacja, założenie klubu');
+  await Promise.all([linkAndFound(A, codeA, clubA, 'ORK'), linkAndFound(B, codeB, clubB, 'HLI')]);
+  log('8. Rynek transferowy (A) i mecze o nagrodę z komputerem (A i B)');
+  await buyFromMarket(A);
+  await Promise.all([prizeMatch(A), prizeMatch(B)]);
+  log('9. B sponsoruje klub A; mecz online klubów z nagrodami');
+  await sponsor(B, clubA);
+  await A.tap('← Wstecz').catch(() => {});
+  await goOnline(A, 'host', 'London Navigators', '', false, true); // the server swaps in the online club
+  await waitFor('9: room created', 15_000, async () => (await A.state()).status === 'room');
+  await goOnline(B, 'join', 'London Navigators', (await A.state()).room, false, true);
+  await waitFor('9: club match starts', 20_000, async () => (await A.state()).status === 'playing' && (await B.state()).status === 'playing');
+  await sleep(1500);
+  A.snap('klub-online-start'); B.snap('klub-online-start');
+  const names = (await B.state()).names;
+  check('9: the server brought both online clubs', names?.[0] === clubA && names?.[1] === clubB, names?.join(' – '));
+  const sponsors = await A.js<string[][]>(`kickabout.app.run.info.sponsors`);
+  check('9: sponsor shown before kick-off', JSON.stringify(sponsors).includes(sponsorName), JSON.stringify(sponsors));
+  await bothFinish('klub-online', A, B, false);
+  await sleep(2000);
+  const rewards = [await A.js<number>(`kickabout.app.run?.spec.net?.reward ?? -1`).catch(() => -1), await B.js<number>(`kickabout.app.run?.spec.net?.reward ?? -1`).catch(() => -1)];
+  check('9: both owners got prize money from the server', rewards.every((r) => r > 0), rewards.join(', '));
 }
 
 async function main() {
@@ -307,6 +414,12 @@ async function main() {
   const A = new Device('A', SERIAL_A, 9401), B = new Device('B', SERIAL_B, 9402);
   await Promise.all([A.launch(), B.launch()]);
   A.snap('start'); B.snap('start');
+  const phases = (process.env.PHASES ?? 'basic,club').split(',');
+  if (!phases.includes('basic')) {
+    await Promise.all([setOptions(A, 'pl', '5 min', false), setOptions(B, 'en', '5 min', false)]);
+    await clubPhase(A, B);
+    return finish();
+  }
 
   log('1. Konfiguracja aplikacji i drużyn');
   await Promise.all([setOptions(A, 'pl', '5 min', false), setOptions(B, 'en', '5 min', false)]);
@@ -376,6 +489,11 @@ async function main() {
   A.snap('strona-www');
   adb(SERIAL_A, 'shell', 'input', 'keyevent', 'KEYCODE_BACK');
 
+  if (phases.includes('club')) await clubPhase(A, B);
+  finish();
+}
+
+function finish() {
   const failed = results.filter(([, ok]) => !ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed; screenshots in ${SHOTS}`);
   process.exit(failed.length ? 1 : 0);
